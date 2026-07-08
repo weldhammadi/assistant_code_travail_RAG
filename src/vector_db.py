@@ -47,29 +47,41 @@ class VectorDB:
 			}
 		)
 
-		chunks = [chunk["text"] for chunk in corpus_dict]
-		embeddings = self.get_embeddings(chunks)
+		print("Calcul des embeddings en cours...")
+		texts = [chunk["text"] for chunk in corpus_dict]
+		embeddings = self.get_embeddings(texts)
 
-		collection.add(
-    		ids=[chunk["id"] for chunk in corpus_dict],
-    		documents=[chunk["text"] for chunk in corpus_dict],
-    		embeddings=embeddings,
-			metadatas=[
-				{
-					"id": chunk["id"],
-					"code": chunk.get("code", "Code du travail"),
-					"source": chunk.get("source", "Inconnue"),
-					"categorie": chunk.get("categorie", "Inconnue"),
-					"num": chunk.get("num") if chunk.get("num") is not None else "",
-					"cid": chunk.get("cid") if chunk.get("cid") is not None else "",
-					"etat": chunk.get("etat", "Inconnue"),
-					"date_debut_vigueur": int(chunk["date_debut_vigueur"]) if chunk.get("date_debut_vigueur") is not None else 0,
-					"date_fin_vigueur": int(chunk["date_fin_vigueur"]) if chunk.get("date_fin_vigueur") is not None else 0,
-					"url": chunk.get("url") if chunk.get("url") is not None else ""
-				}
-				for chunk in corpus_dict
-			]
-)
+		# 1. Préparation de toutes les listes
+		ids = [chunk["id"] for chunk in corpus_dict]
+		metadatas = [
+			{
+				"id": chunk["id"],
+				"code": chunk.get("code", "Code du travail"),
+				"source": chunk.get("source", "Inconnue"),
+				"categorie": chunk.get("categorie", "Inconnue"),
+				"num": chunk.get("num") if chunk.get("num") is not None else "",
+				"cid": chunk.get("cid") if chunk.get("cid") is not None else "",
+				"etat": chunk.get("etat", "Inconnue"),
+				"date_debut_vigueur": int(chunk["date_debut_vigueur"]) if chunk.get("date_debut_vigueur") is not None else 0,
+				"date_fin_vigueur": int(chunk["date_fin_vigueur"]) if chunk.get("date_fin_vigueur") is not None else 0,
+				"url": chunk.get("url") if chunk.get("url") is not None else ""
+			}
+			for chunk in corpus_dict
+		]
+
+		# 2. Insertion par lots (batches) pour éviter la limite de 5461 de ChromaDB
+		batch_size = 5000 
+		print(f"Insertion de {len(ids)} chunks dans ChromaDB par lots de {batch_size}...")
+		
+		for i in range(0, len(ids), batch_size):
+			end_idx = i + batch_size
+			collection.add(
+				ids=ids[i:end_idx],
+				documents=texts[i:end_idx],
+				embeddings=embeddings[i:end_idx],
+				metadatas=metadatas[i:end_idx]
+			)
+			print(f"  -> Batch inséré : {min(end_idx, len(ids))}/{len(ids)}")
 
 	def get_embeddings(self, chuncks):
 		embeddings = self.sentence_transformers_object.encode(
@@ -121,4 +133,4 @@ if __name__ == "__main__":
 	with open(PARSED_CORPUS_PATH, "r", encoding="utf-8") as f:
 		corpus_dict = json.load(f)
 	vector_db_object = VectorDB(str(VECTOR_DB_PATH), corpus_dict)
-	print(vector_db_object.retrieve(question="De quoi parle l'article L1?"))
+	print(vector_db_object.retrieve(question="Combien d'heures de travail sont necéssaire pour le SMIC?"))
