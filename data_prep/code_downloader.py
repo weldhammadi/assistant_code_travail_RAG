@@ -39,3 +39,8 @@ class CodeTravailDownloader:
         path = self.download(force=force_download)
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
+
+if __name__ == "__main__":
+    downloader = CodeTravailDownloader("LEGITEXT000006072050", cache_dir=Path("raw_cache"))
+    raw_tree = downloader.load(force_download=False)
+    print(json.dumps(raw_tree, indent=2, ensure_ascii=False))
