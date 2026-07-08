@@ -65,7 +65,7 @@ class CodeTravailParser:
 
         num = data.get("num") or data.get("cid")
         cid = data.get("cid")
-        categorie = self._infer_categorie(hierarchy.get("partie"))
+        categorie = self._infer_categorie(hierarchy.get("partie_racine"))
         breadcrumb = self._build_breadcrumb(hierarchy)
         
         # Récupération de l'ID de la version la plus récente
