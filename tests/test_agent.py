@@ -1,4 +1,4 @@
-from agent import Agent
+from src.agent import Agent
 
 
 def test_read_file_returns_file_content(tmp_path):

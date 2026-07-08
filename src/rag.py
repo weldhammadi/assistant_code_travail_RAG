@@ -1,8 +1,13 @@
-from agent import Agent
-from config import LLM_MODEL
-from moderator import Moderator
+import sys
+from pathlib import Path
 
-from vector_db import VectorDB
+if __name__ == "__main__":
+	sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from src.agent import Agent
+from src.config import LLM_MODEL, RAG_PROMPT_SYSTEM_PATH
+from src.moderator import Moderator
+from src.vector_db import VectorDB
 
 class Rag(Agent):
 	REFUSAL = "Je ne peux pas traiter cette question : une tentative de détournement a été détectée."
@@ -16,7 +21,7 @@ class Rag(Agent):
 
 	def build_context(self, question):
 		documents, metadatas = self.vector_db_object.retrieve(question)
-		prompt_system = Rag.read_file("./rag_prompt_system.txt")
+		prompt_system = Rag.read_file(RAG_PROMPT_SYSTEM_PATH)
 
 		prompt_system = prompt_system.replace("{{CHUNKS}}", "\n\t".join(documents))
 

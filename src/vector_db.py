@@ -1,6 +1,12 @@
+import sys
+from pathlib import Path
+
+if __name__ == "__main__":
+	sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import chromadb
 from sentence_transformers import SentenceTransformer
-from config import EMBEDDING_MODEL
+from src.config import BASE_DIR, EMBEDDING_MODEL
 
 import os
 import pandas
@@ -77,7 +83,7 @@ class VectorDB:
 if __name__ == "__main__":
 	vector_db_path="my_vector_db"
 	
-	corpus_df=pandas.read_csv("05_corpus_rag.csv")
+	corpus_df=pandas.read_csv(BASE_DIR / "05_corpus_rag.csv")
 
 	vector_db_object = VectorDB(vector_db_path, corpus_df)
 

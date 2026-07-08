@@ -1,6 +1,6 @@
 import pandas
 
-from vector_db import VectorDB
+from src.vector_db import VectorDB
 
 
 def test_create_vector_db_and_retrieve(tmp_path):

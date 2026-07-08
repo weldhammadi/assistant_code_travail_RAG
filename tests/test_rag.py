@@ -1,8 +1,8 @@
 import pandas
 import pytest
 
-from rag import Rag
-from vector_db import VectorDB
+from src.rag import Rag
+from src.vector_db import VectorDB
 
 
 @pytest.fixture(scope="module")

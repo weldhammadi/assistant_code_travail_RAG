@@ -1,4 +1,4 @@
-from moderator import Moderator
+from src.moderator import Moderator
 
 
 def test_moderate_allows_legitimate_question():

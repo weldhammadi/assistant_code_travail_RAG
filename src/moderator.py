@@ -1,7 +1,12 @@
 import json
+import sys
+from pathlib import Path
 
-import config
-from agent import Agent
+if __name__ == "__main__":
+	sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from src import config
+from src.agent import Agent
 
 
 class Moderator(Agent):
