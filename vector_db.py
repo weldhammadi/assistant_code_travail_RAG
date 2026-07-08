@@ -16,11 +16,19 @@ class VectorDB:
 
 
 	def load_vector_db(self, vector_db_path):
-		pass
+		print("Loading Vector DB")
+		self.chroma_vector_db = chromadb.PersistentClient(path=vector_db_path)
+		collection = self.chroma_vector_db.get_collection(name="rag_knowledge")
+
+		if "embedding_model" in collection.metadata.keys():
+			self.sentence_transformers_object = SentenceTransformer(collection.metadata["embedding_model"])
+		else:
+			raise(Exception("Error : we miss the embeddings model's name information"))
 
 
-
+	
 	def create_vector_db(self, vector_db_path, corpus_df):
+		print("Creating Vector DB")
 		self.sentence_transformers_object = SentenceTransformer(EMBEDDING_MODEL)
 
 		self.chroma_vector_db = chromadb.PersistentClient(path=vector_db_path)
