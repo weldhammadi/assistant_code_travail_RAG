@@ -2,25 +2,20 @@
 Code downloader for fetching data from Legifrance.
 """
 import json
-import sys
 import urllib.request
 from pathlib import Path
-
-if __name__ == "__main__":
-	sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src.config import SOURCE_URL_TEMPLATE
 
 class CodeTravailDownloader:
     """Télécharge (avec cache local) le JSON brut d'un texte Légifrance."""
 
-    def __init__(self, legi_id: str, cache_dir: Path):
+    def __init__(self, source_url_template: str, legi_id: str, cache_dir: Path):
         self.legi_id = legi_id
         self.cache_path = cache_dir / f"{legi_id}.json"
+        self.source_url_template = source_url_template
 
     @property
     def source_url(self) -> str:
-        return SOURCE_URL_TEMPLATE.format(legi_id=self.legi_id)
+        return self.source_url_template.format(legi_id=self.legi_id)
 
     def download(self, force: bool = False) -> Path:
         """Télécharge le fichier si nécessaire et retourne son chemin local."""
@@ -39,8 +34,3 @@ class CodeTravailDownloader:
         path = self.download(force=force_download)
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-
-if __name__ == "__main__":
-    downloader = CodeTravailDownloader("LEGITEXT000006072050", cache_dir=Path("raw_cache"))
-    raw_tree = downloader.load(force_download=False)
-    print(json.dumps(raw_tree, indent=2, ensure_ascii=False))
