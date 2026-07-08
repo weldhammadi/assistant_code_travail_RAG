@@ -25,7 +25,7 @@ SOURCE_URL_TEMPLATE = (
     )
 LEGI_TEXT_ID = "LEGITEXT000006072050"
 
-LEGIFRANCE_ARTICLE_URL = "https://www.legifrance.gouv.fr/codes/article_lc/{id}"
+LEGIFRANCE_ARTICLE_URL_TEMPLATE = "https://www.legifrance.gouv.fr/codes/article_lc/{id}"
 
 CODE_NAME = "Code du travail"
 
