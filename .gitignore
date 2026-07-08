@@ -222,3 +222,6 @@ __marimo__/
 
 # Requirements pour Manon
 requirements_manon.txt
+
+# cache
+raw_cache
