@@ -25,7 +25,6 @@ class VectorDB:
 		else:
 			raise(Exception("Error : we miss the embeddings model's name information"))
 
-
 	
 	def create_vector_db(self, vector_db_path, corpus_df):
 		print("Creating Vector DB")
@@ -53,9 +52,6 @@ class VectorDB:
 
 
 
-
-
-
 	def get_embeddings(self, chuncks):
 		embeddings = self.sentence_transformers_object.encode(
 			chuncks,
@@ -68,7 +64,14 @@ class VectorDB:
 
 
 	def retrieve(self, question, n=3):
-		pass
+		embedded_question = self.get_embeddings([question])
+
+		collection = self.chroma_vector_db.get_collection("rag_knowledge")
+
+		results = collection.query(query_embeddings=embedded_question, n_results=n)
+
+		return results["documents"], results["metadatas"]
+
 
 
 if __name__ == "__main__":
@@ -77,3 +80,6 @@ if __name__ == "__main__":
 	corpus_df=pandas.read_csv("05_corpus_rag.csv")
 
 	vector_db_object = VectorDB(vector_db_path, corpus_df)
+
+
+	print(vector_db_object.retrieve(question="Quelle est la coleur et le nom du chat de Bob ?"))
