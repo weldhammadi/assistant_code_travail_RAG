@@ -228,3 +228,5 @@ data/
 
 # IDE
 .vscode/
+
+.DS_Store
