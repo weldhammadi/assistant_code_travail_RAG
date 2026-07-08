@@ -23,6 +23,15 @@ class VectorDB:
 	def create_vector_db(self, vector_db_path, chuncks):
 		self.sentence_transformers_object = SentenceTransformer(EMBEDDING_MODEL)
 
+		self.chroma_vector_db = chromadb.PersistentClient(path=vector_db_path)
+
+		collection = self.chroma_vector_db.get_or_create_collection(
+			name="rag_knowledge",
+			metadata={
+				"embedding_model": EMBEDDING_MODEL
+			}
+		)
+
 
 
 	def get_embeddings(self, chuncks):
@@ -42,6 +51,6 @@ class VectorDB:
 
 if __name__ == "__main__":
 	vector_db_path="my_vector_db"
-	chuncks=pandas.read_csv("05_corpus_rag.csv")
+	chuncks=pandas.read_csv("05_corpus_rag.csv")["text"].values
 
 	vector_db_object = VectorDB(vector_db_path, chuncks)
