@@ -12,6 +12,8 @@ Repo structure: originally a flat layout (`agent.py`, `config.py`, `rag.py`, `ve
 - [x] Step 4 — Wire `Moderator` into `rag.py`'s `ask_rag`: moderate first, refuse without ever calling the main LLM
 - [x] Step 5 — `tests/` folder with one test file per project module
 - [x] Structural refactor — moved code/prompts into `src/` and `prompts/` (before building the UI)
+- [x] Branch sync — rebased `feature/user-interface` onto `dev` to pick up the moderator work + refactor
+- [x] UI — `api.py` (FastAPI), `static/index.html` (vanilla chat UI), `Procfile`, `tests/test_api.py`
 
 ## Log
 
@@ -92,3 +94,22 @@ This inserts the repo root onto `sys.path` only when the file is run directly (h
 Also made `vector_db.py`'s `__main__` block cwd-independent: it now loads `05_corpus_rag.csv` via `BASE_DIR / "05_corpus_rag.csv"` (from `config`) instead of the relative string `"05_corpus_rag.csv"`, which would break if the script were launched from a directory other than the repo root.
 
 **Verified:** `python src/rag.py` and `python -m src.rag` both now fail only on the sandbox's missing `pandas` install (past the import-resolution stage); `pytest --collect-only` still collects all 8 tests cleanly (2 pre-existing `pandas`-related collection errors, unrelated to this fix).
+
+### Branch sync — feature/user-interface rebased onto dev (done)
+User had created `feature/user-interface` before the moderator work + structural refactor landed on `dev` (it was still sitting at `0e72e75`, "feature: now we have a working rag" — pre-moderator). Asked user merge vs. rebase; chose rebase.
+
+- `git checkout feature/user-interface` then `git rebase dev` — no conflicts.
+- Turned out to be a pure fast-forward: `feature/user-interface` had no commits of its own yet, so rebasing just moved it to `dev`'s tip (`84b6647`) without rewriting any history. Confirmed via `git merge-base --is-ancestor origin/feature/user-interface feature/user-interface` → true, so a plain `git push` (no `--force`) is enough.
+- Not pushed by the assistant — user pushes themselves, per this project's established workflow (confirmed explicitly: assistant does not run git commands beyond what's directly asked).
+
+### UI — api.py, static/index.html, Procfile, tests/test_api.py (done)
+Built on top of prep.md's steps 7-9, adapted to the now-`src/`-packaged code and to this repo's actual `Rag` class (whose `ask_rag` returns a 3-tuple `(answer, documents, metadatas)`, unlike prep.md's assumed single-return `answer_question`).
+
+- [src/config.py](src/config.py): added `CORPUS_PATH = BASE_DIR / "05_corpus_rag.csv"` and `VECTOR_DB_PATH = BASE_DIR / "my_vector_db"` — single source of truth for both paths, now reused everywhere instead of scattered literals. Updated `src/vector_db.py`'s and `src/rag.py`'s `__main__` blocks, plus `tests/test_vector_db.py` and `tests/test_rag.py`, to use these constants instead of hardcoded `"my_vector_db"` / `"05_corpus_rag.csv"` strings.
+- [api.py](api.py) (root): FastAPI app with a `lifespan` that builds `my_vector_db/` from the corpus CSV if it doesn't exist yet, then instantiates `Rag`. `GET /` serves `static/index.html`; `POST /ask` takes `{"question": str}` and returns `{"answer": str}` (moderation refusal and normal answers both flow through the same field — the contract stays a plain string either way).
+- [static/index.html](static/index.html): single self-contained vanilla HTML/CSS/JS chat UI (no external dependencies, no build step) — auto-growing textarea, Enter-to-send (Shift+Enter for newline), light/dark aware via `prefers-color-scheme`, distinct bubble style reserved for client-side network errors (the API itself doesn't distinguish a moderation refusal from a normal answer at the wire level, so both render as a normal assistant bubble).
+- [Procfile](Procfile): `web: uvicorn api:app --host 0.0.0.0 --port $PORT`.
+- [tests/test_api.py](tests/test_api.py): real integration tests via `fastapi.testclient.TestClient` — legit question returns an answer mentioning "henri" (Bob's cat), an injection attempt returns the moderator's refusal text, and `GET /` serves HTML. Added `httpx` to [requirements.txt](requirements.txt) since `TestClient` needs it.
+- **Found and fixed a gap while wiring this up:** `my_vector_db/` (the persisted Chroma DB directory) was not in [.gitignore](.gitignore) — added `/my_vector_db/` so this generated, potentially large binary data directory never gets committed.
+
+**Verified:** `pytest --collect-only` after all of the above — 8 tests collected, only the pre-existing `pandas`-dependent modules erroring in this sandbox (no `pandas`/`.env` here); `python -m py_compile api.py` passes.
