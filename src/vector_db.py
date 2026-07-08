@@ -100,10 +100,10 @@ class VectorDB:
             query_embeddings=[query_vector],
             n_results=n
         )
-		formatted_results = self.format_chroma_results(results)
+		formatted_results = self._format_chroma_results(results)
 		return formatted_results
 	
-	def format_chroma_results(self, results: dict) -> list[dict]:
+	def _format_chroma_results(self, results: dict) -> list[dict]:
     	# On extrait la première liste (index 0) car Chroma renvoie une liste de listes (batch)
 		documents = results.get("documents", [[]])[0] if results.get("documents") else []
 		metadatas = results.get("metadatas", [[]])[0] if results.get("metadatas") else []
