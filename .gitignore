@@ -3,6 +3,9 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Persistent vector DB (generated from the corpus, not source)
+/my_vector_db/
+
 # C extensions
 *.so
 
