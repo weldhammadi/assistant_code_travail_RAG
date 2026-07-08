@@ -35,9 +35,14 @@ class Rag(Agent):
 		matched_chunks = self.vector_db_object.retrieve(question)
 		prompt_system = Rag.read_file(RAG_PROMPT_SYSTEM_PATH)
 
+		MAX_CHARS_PER_CHUNK = 800  # Plafonne la taille de chaque chunk injecté dans le prompt
+
 		chunks_text = ""
 		for idx, chunk in enumerate(matched_chunks):
 			text = chunk["text"]
+			if len(text) > MAX_CHARS_PER_CHUNK:
+				text = text[:MAX_CHARS_PER_CHUNK].rsplit(" ", 1)[0] + "..."
+
 			label = f"Article {chunk['num']}" if chunk.get("num") else f"Article {idx}"
 			entry = f"\n[{label}] (Source: {chunk.get('source', 'Inconnue')})"
 			if chunk.get("url"):
@@ -45,9 +50,11 @@ class Rag(Agent):
 			entry += f"\n{text}\n"
 			chunks_text += entry
 
-		prompt_system = prompt_system.replace("{{CHUNKS}}", "\n\t".join(chunks_text))
+		# chunks_text est déjà une chaîne complète : pas besoin (et surtout pas question) de la
+		# rejoindre caractère par caractère avec "\n\t".join(...), qui multipliait sa taille par ~3.
+		prompt_system = prompt_system.replace("{{CHUNKS}}", chunks_text)
 
-		return prompt_system
+		return prompt_system, matched_chunks
 
 
 	def ask_rag(self, question):
@@ -56,7 +63,7 @@ class Rag(Agent):
 			return self.REFUSAL, [], []
 
 		
-		prompt_system = self.build_context(question)
+		prompt_system, matched_chunks = self.build_context(question)
 
 		chat_completion = self.client.chat.completions.create(
 			messages=[
@@ -74,6 +81,10 @@ class Rag(Agent):
 		)
 
 		rag_response = chat_completion.choices[0].message.content
+
+		documents = [chunk["text"] for chunk in matched_chunks]
+		metadatas = [{k: v for k, v in chunk.items() if k != "text"} for chunk in matched_chunks]
+
 		return rag_response, documents, metadatas
 
 
