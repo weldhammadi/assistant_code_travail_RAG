@@ -9,7 +9,8 @@ class CodeTravailParser:
     """Transforme l'arbre JSON Légifrance en une liste plate de Chunk."""
 
     def __init__(self, 
-                 section_patterns: list, 
+                 section_patterns: list,
+                 legifrance_article_url_template: str, 
                  raw_json_code: dict,
                  code_name: str,
                  include_abroges: bool = False, 
@@ -20,6 +21,7 @@ class CodeTravailParser:
         self.section_patterns = section_patterns
         self.raw_tree = raw_json_code
         self.code_name = code_name
+        self.legifrance_article_url_template = legifrance_article_url_template
 
     # Point d'entrée du parser
     def parse(self, raw_tree: dict) -> list:
@@ -74,7 +76,7 @@ class CodeTravailParser:
             latest_version = max(versions, key=lambda v: v.get("dateDebut") or 0)
             latest_id = latest_version.get("id", cid)
             
-        url = self.legifrancearticle_url.format(id=latest_id) if latest_id else None
+        url = self.legifrance_article_url_template.format(id=latest_id) if latest_id else None
 
         blocks = self._split_long_text(text) if len(text) > self.max_chars else [text]
 

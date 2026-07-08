@@ -15,6 +15,7 @@ class CodeOrchestrator:
         output_path: Path,
         raw_cache_dir: Path,
         source_url_template: str,
+        legifrance_article_url_template: str,
         legi_id: str,
         code_name: str,
         section_patterns: list,
@@ -25,6 +26,7 @@ class CodeOrchestrator:
         self.downloader = CodeTravailDownloader(source_url_template, legi_id, cache_dir=raw_cache_dir)
         self.parser = CodeTravailParser(section_patterns=section_patterns, 
                                         raw_json_code={}, 
+                                        legifrance_article_url_template=legifrance_article_url_template, 
                                         code_name=code_name, 
                                         include_abroges=include_abroges, 
                                         max_chars=max_chars)
