@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import os
 from pathlib import Path
+import re
 
 load_dotenv()
 
@@ -18,7 +19,21 @@ RAG_PROMPT_SYSTEM_PATH = PROMPTS_DIR / "rag_prompt_system.txt"
 CORPUS_PATH = BASE_DIR / "05_corpus_rag.csv"
 VECTOR_DB_PATH = BASE_DIR / "my_vector_db"
 
+# Legifrance config
 SOURCE_URL_TEMPLATE = (
         "https://raw.githubusercontent.com/SocialGouv/legi-data/master/data/{legi_id}.json"
     )
 LEGI_TEXT_ID = "LEGITEXT000006072050"
+
+LEGIFRANCE_ARTICLE_URL = "https://www.legifrance.gouv.fr/codes/article_lc/{id}"
+
+CODE_NAME = "Code du travail"
+
+SECTION_PATTERNS = [
+        ("partie", re.compile(r"^\s*(Partie [\wàéèê]+|Première partie|Deuxième partie|Troisième partie|Quatrième partie)", re.IGNORECASE)),
+        ("livre", re.compile(r"^\s*Livre\b", re.IGNORECASE)),
+        ("titre", re.compile(r"^\s*Titre\b", re.IGNORECASE)),
+        ("chapitre", re.compile(r"^\s*Chapitre\b", re.IGNORECASE)),
+        ("section", re.compile(r"^\s*Section\b", re.IGNORECASE)),
+        ("sous_section", re.compile(r"^\s*Sous-section\b", re.IGNORECASE)),
+    ]
