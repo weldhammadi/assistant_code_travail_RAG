@@ -70,7 +70,7 @@ class VectorDB:
 
 		results = collection.query(query_embeddings=embedded_question, n_results=n)
 
-		return results["documents"], results["metadatas"]
+		return results["documents"][0], results["metadatas"][0]
 
 
 
