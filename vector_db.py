@@ -21,12 +21,18 @@ class VectorDB:
 
 
 	def create_vector_db(self, vector_db_path, chuncks):
-		pass
+		self.sentence_transformers_object = SentenceTransformer(EMBEDDING_MODEL)
 
 
 
 	def get_embeddings(self, chuncks):
-		pass
+		embeddings = self.sentence_transformers_object.encode(
+			chuncks,
+			batch_size=64,
+			normalize_embeddings=True,
+			show_progress_bar=True
+		).tolist()
+		return embeddings
 
 
 
