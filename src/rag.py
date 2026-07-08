@@ -1,18 +1,27 @@
-from agent import Agent
-from config import LLM_MODEL
+import sys
+from pathlib import Path
 
-from vector_db import VectorDB
+if __name__ == "__main__":
+	sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from src.agent import Agent
+from src.config import LLM_MODEL, RAG_PROMPT_SYSTEM_PATH
+from src.moderator import Moderator
+from src.vector_db import VectorDB
 
 class Rag(Agent):
+	REFUSAL = "Je ne peux pas traiter cette question : une tentative de détournement a été détectée."
+
 	def __init__(self, vector_db_path):
 		super().__init__()
 		self.vector_db_object = VectorDB(vector_db_path=vector_db_path)
+		self.moderator = Moderator()
 
 
 
 	def build_context(self, question):
 		documents, metadatas = self.vector_db_object.retrieve(question)
-		prompt_system = Rag.read_file("./rag_prompt_system.txt")
+		prompt_system = Rag.read_file(RAG_PROMPT_SYSTEM_PATH)
 
 		prompt_system = prompt_system.replace("{{CHUNKS}}", "\n\t".join(documents))
 
@@ -21,8 +30,11 @@ class Rag(Agent):
 
 	def ask_rag(self, question):
 
+		if self.moderator.moderate(question)["is_prompt_injection"]:
+			return self.REFUSAL, [], []
+
 		prompt_system, documents, metadatas = self.build_context(question)
-		
+
 		chat_completion = self.client.chat.completions.create(
 			messages=[
 				{
