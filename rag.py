@@ -1,12 +1,16 @@
 from agent import Agent
 from config import LLM_MODEL
+from moderator import Moderator
 
 from vector_db import VectorDB
 
 class Rag(Agent):
+	REFUSAL = "Je ne peux pas traiter cette question : une tentative de détournement a été détectée."
+
 	def __init__(self, vector_db_path):
 		super().__init__()
 		self.vector_db_object = VectorDB(vector_db_path=vector_db_path)
+		self.moderator = Moderator()
 
 
 
@@ -21,8 +25,11 @@ class Rag(Agent):
 
 	def ask_rag(self, question):
 
+		if self.moderator.moderate(question)["is_prompt_injection"]:
+			return self.REFUSAL, [], []
+
 		prompt_system, documents, metadatas = self.build_context(question)
-		
+
 		chat_completion = self.client.chat.completions.create(
 			messages=[
 				{
