@@ -17,3 +17,8 @@ MODERATOR_SYSTEM_PROMPT_PATH = PROMPTS_DIR / "moderator_system.txt"
 RAG_PROMPT_SYSTEM_PATH = PROMPTS_DIR / "rag_prompt_system.txt"
 CORPUS_PATH = BASE_DIR / "05_corpus_rag.csv"
 VECTOR_DB_PATH = BASE_DIR / "my_vector_db"
+
+SOURCE_URL_TEMPLATE = (
+        "https://raw.githubusercontent.com/SocialGouv/legi-data/master/data/{legi_id}.json"
+    )
+LEGI_TEXT_ID = "LEGITEXT000006072050"
