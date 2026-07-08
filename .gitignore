@@ -225,3 +225,6 @@ requirements_manon.txt
 
 # Data
 data/
+
+# IDE
+.vscode/
