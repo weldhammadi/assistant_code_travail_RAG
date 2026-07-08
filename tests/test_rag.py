@@ -1,6 +1,7 @@
 import pandas
 import pytest
 
+from src import config
 from src.rag import Rag
 from src.vector_db import VectorDB
 
@@ -8,7 +9,7 @@ from src.vector_db import VectorDB
 @pytest.fixture(scope="module")
 def rag(tmp_path_factory):
 	vector_db_path = str(tmp_path_factory.mktemp("vector_db"))
-	corpus_df = pandas.read_csv("05_corpus_rag.csv")
+	corpus_df = pandas.read_csv(config.CORPUS_PATH)
 	VectorDB(vector_db_path=vector_db_path, corpus_df=corpus_df)
 
 	return Rag(vector_db_path=vector_db_path)
