@@ -6,7 +6,7 @@ if __name__ == "__main__":
 
 import chromadb
 from sentence_transformers import SentenceTransformer
-from src.config import BASE_DIR, EMBEDDING_MODEL
+from src.config import CORPUS_PATH, EMBEDDING_MODEL, VECTOR_DB_PATH
 
 import os
 import pandas
@@ -81,11 +81,9 @@ class VectorDB:
 
 
 if __name__ == "__main__":
-	vector_db_path="my_vector_db"
-	
-	corpus_df=pandas.read_csv(BASE_DIR / "05_corpus_rag.csv")
+	corpus_df=pandas.read_csv(CORPUS_PATH)
 
-	vector_db_object = VectorDB(vector_db_path, corpus_df)
+	vector_db_object = VectorDB(str(VECTOR_DB_PATH), corpus_df)
 
 
 	print(vector_db_object.retrieve(question="Quelle est la coleur et le nom du chat de Bob ?"))
