@@ -2,9 +2,14 @@
 Code downloader for fetching data from Legifrance.
 """
 import json
+import sys
 import urllib.request
 from pathlib import Path
-from ..src.config import SOURCE_URL_TEMPLATE
+
+if __name__ == "__main__":
+	sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from src.config import SOURCE_URL_TEMPLATE
 
 class CodeTravailDownloader:
     """Télécharge (avec cache local) le JSON brut d'un texte Légifrance."""
@@ -15,7 +20,7 @@ class CodeTravailDownloader:
 
     @property
     def source_url(self) -> str:
-        return self.SOURCE_URL_TEMPLATE.format(legi_id=self.legi_id)
+        return SOURCE_URL_TEMPLATE.format(legi_id=self.legi_id)
 
     def download(self, force: bool = False) -> Path:
         """Télécharge le fichier si nécessaire et retourne son chemin local."""
