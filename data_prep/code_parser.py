@@ -2,28 +2,26 @@
 Parsing de l'arborescence Légifrance
 """
 import re
-import sys
-from pathlib import Path
 from typing import Optional
 from chunk_structure import Chunk
-
-if __name__ == "__main__":
-	sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src.config import LEGIFRANCE_ARTICLE_URL, CODE_NAME, SECTION_PATTERNS, LEGI_TEXT_ID
 
 class CodeTravailParser:
     """Transforme l'arbre JSON Légifrance en une liste plate de Chunk."""
 
-    def __init__(self, include_abroges: bool = False, max_chars: int = 3000):
+    def __init__(self, 
+                 section_patterns: list, 
+                 raw_json_code: dict,
+                 code_name: str,
+                 include_abroges: bool = False, 
+                 max_chars: int = 3000):
         self.include_abroges = include_abroges
         self.max_chars = max_chars
         self._id_counts: dict = {}
-        self.section_patterns = SECTION_PATTERNS
-        self.legifrancearticle_url = LEGIFRANCE_ARTICLE_URL
-        self.code_name = CODE_NAME
+        self.section_patterns = section_patterns
+        self.raw_tree = raw_json_code
+        self.code_name = code_name
 
-    # API publique
+    # Point d'entrée du parser
     def parse(self, raw_tree: dict) -> list:
         """Point d'entrée : parcourt l'arbre et retourne la liste de Chunk dédupliqués."""
         self._id_counts = {}
@@ -116,13 +114,16 @@ class CodeTravailParser:
         return text.strip()
 
     @staticmethod
-    def _infer_categorie(num: Optional[str]) -> str:
-        if not num:
+    def _infer_categorie(partie_racine: Optional[str]) -> str:
+        """Déduit la catégorie depuis la racine structurelle de l'arbre Légifrance"""
+        if not partie_racine:
             return "autre"
-        if num.upper().startswith("L"):
-            return "legislatif"
-        if num.upper().startswith("R"):
-            return "reglementaire"
+        title = partie_racine.lower()
+        ancienne = "ancienne" in title
+        if title.startswith("partie législative") or title.startswith("partie legislative"):
+            return "legislatif_ancien" if ancienne else "legislatif"
+        if title.startswith("partie réglementaire") or title.startswith("partie reglementaire"):
+            return "reglementaire_ancien" if ancienne else "reglementaire"
         return "autre"
 
     @staticmethod
@@ -173,17 +174,3 @@ class CodeTravailParser:
         suffix = (cid or "")[-6:] or str(self._id_counts[base_id])
         return f"{base_id}_{suffix}"
     
-if __name__ == "__main__":
-    # Test rapide du parser
-    import json
-    from data_prep.code_downloader import CodeTravailDownloader
-
-    downloader = CodeTravailDownloader(LEGI_TEXT_ID, cache_dir=Path("raw_cache"))
-    raw_tree = downloader.load(force_download=False)
-
-    parser = CodeTravailParser(include_abroges=False, max_chars=3000)
-    chunks = parser.parse(raw_tree)
-
-    print(f"Nombre de chunks générés : {len(chunks)}")
-    for chunk in chunks[:5]:
-        print(json.dumps(chunk.to_dict(), ensure_ascii=False, indent=2))

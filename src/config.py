@@ -30,7 +30,8 @@ LEGIFRANCE_ARTICLE_URL = "https://www.legifrance.gouv.fr/codes/article_lc/{id}"
 CODE_NAME = "Code du travail"
 
 SECTION_PATTERNS = [
-        ("partie", re.compile(r"^\s*(Partie [\wàéèê]+|Première partie|Deuxième partie|Troisième partie|Quatrième partie)", re.IGNORECASE)),
+        ("partie_racine", re.compile(r"^\s*Partie\s+(l[ée]gislative|r[ée]glementaire)", re.IGNORECASE)),
+        ("partie_numerotee", re.compile(r"^\s*(Premi[èe]re|Deuxi[èe]me|Troisi[èe]me|Quatri[èe]me|Cinqui[èe]me)\s+partie\b", re.IGNORECASE)),
         ("livre", re.compile(r"^\s*Livre\b", re.IGNORECASE)),
         ("titre", re.compile(r"^\s*Titre\b", re.IGNORECASE)),
         ("chapitre", re.compile(r"^\s*Chapitre\b", re.IGNORECASE)),
