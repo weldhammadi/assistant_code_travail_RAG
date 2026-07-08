@@ -8,11 +8,6 @@ import sys
 from typing import Optional
 import json
 
-if __name__ == "__main__":
-	sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-     
-from src.config import LEGI_TEXT_ID
-
 class CodeOrchestrator:
     """Chef d'orchestre : téléchargement -> parsing -> écriture du corpus JSON."""
     def __init__(
