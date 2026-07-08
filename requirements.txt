@@ -4,3 +4,6 @@ sentence-transformers
 chromadb
 pandas
 pytest
+fastapi
+uvicorn
+httpx

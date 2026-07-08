@@ -5,7 +5,7 @@ if __name__ == "__main__":
 	sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.agent import Agent
-from src.config import LLM_MODEL, RAG_PROMPT_SYSTEM_PATH
+from src.config import LLM_MODEL, RAG_PROMPT_SYSTEM_PATH, VECTOR_DB_PATH
 from src.moderator import Moderator
 from src.vector_db import VectorDB
 
@@ -55,9 +55,7 @@ class Rag(Agent):
 
 
 if __name__ == "__main__":
-	vector_db_path="my_vector_db"
-
-	rag_object = Rag(vector_db_path=vector_db_path)
+	rag_object = Rag(vector_db_path=str(VECTOR_DB_PATH))
 
 	rag_response, documents, metadatas = rag_object.ask_rag(question="Quelle est la couleur et le nom du chat de Bob ?")
 

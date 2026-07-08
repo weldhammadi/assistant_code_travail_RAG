@@ -1,11 +1,12 @@
 import pandas
 
+from src import config
 from src.vector_db import VectorDB
 
 
 def test_create_vector_db_and_retrieve(tmp_path):
 	vector_db_path = str(tmp_path / "vector_db")
-	corpus_df = pandas.read_csv("05_corpus_rag.csv")
+	corpus_df = pandas.read_csv(config.CORPUS_PATH)
 
 	vector_db = VectorDB(vector_db_path=vector_db_path, corpus_df=corpus_df)
 	documents, metadatas = vector_db.retrieve("Quelle est la couleur et le nom du chat de Bob ?")
@@ -17,7 +18,7 @@ def test_create_vector_db_and_retrieve(tmp_path):
 
 def test_load_vector_db_reuses_persisted_data(tmp_path):
 	vector_db_path = str(tmp_path / "vector_db")
-	corpus_df = pandas.read_csv("05_corpus_rag.csv")
+	corpus_df = pandas.read_csv(config.CORPUS_PATH)
 	VectorDB(vector_db_path=vector_db_path, corpus_df=corpus_df)
 
 	reloaded_vector_db = VectorDB(vector_db_path=vector_db_path)
