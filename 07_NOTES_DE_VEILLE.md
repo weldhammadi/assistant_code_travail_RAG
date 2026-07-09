@@ -117,6 +117,16 @@ Le GraphRAG serait excellent pour ce cas d'usage :
 ## B. Retrieval hiérarchique — RAPTOR
 *(Recursive Abstractive Processing for Tree-Organized Retrieval)*
 
+**Problème**: Le RAG vectoriel classique compare la question à des chunks individuels et récupère les top-k les plus similaires. Pour une question comme « quels sont les grands thèmes de ce corpus ? », aucun chunk pris isolément n'est une bonne réponse — la similarité sémantique entre la question et chaque petit fragment de texte reste faible, et le top-k ne fait que remonter des passages disparates sans vue d'ensemble.
+
+RAPTOR répond à ça en construisant, dès l'indexation, une hiérarchie de résumés : les chunks sont regroupés par similarité (clustering), chaque groupe est résumé par un LLM, ces résumés sont eux-mêmes regroupés et résumés à un niveau supérieur, et ainsi de suite jusqu'à obtenir un ou quelques résumés de très haut niveau couvrant tout le corpus. Au moment de la requête, on ne cherche plus seulement dans les feuilles (chunks bruts) mais à travers tout l'arbre, récupérant à la fois de l'information à différents niveaux d'abstraction. Une question globale peut alors être satisfaite directement par les nœuds hauts de l'arbre (résumés larges), sans devoir reconstituer artificiellement une vue d'ensemble à partir de fragments épars.
+
+Il s'agit en réalité d'une généralisation du chunking parent-child (application récursive sur plusieurs niveaux plutôt qu'un seul niveau parent/enfant).
+
+### Ressources consultées
+
+- https://arxiv.org/pdf/2401.18059 (consulté le 09/07/26 à 16h02)
+
 ---
 
 ## C. Hybride & rerankers
