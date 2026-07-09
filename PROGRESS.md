@@ -120,21 +120,23 @@ rank 11 anyway) — **worth writing up in the README's Q1 answer and the compte 
 "avec plus de temps" sections** (candidate improvement: hybrid lexical+vector search, or a
 better/larger embedding model, or re-ranking).
 
+Done since the note above was written: **README** is now filled in (justified technical choices, Q1-Q5
+answers, install/run instructions) — also added a Q3 fraîcheur mechanism that didn't exist before:
+`data_prep/code_orchestrator.py::_save_meta()` writes `data/corpus_meta.json` (generated_at date, source
+URL, chunk count) on every ingestion run; `config.CORPUS_META_PATH` points at it; `cli.py::print_freshness_banner()`
+reads it at startup and warns if the corpus is >180 days old. Web API doesn't surface this yet (documented
+as a known limitation in the README, not silently left out).
+
 Still missing (see TodoWrite in active session, or re-derive from pf.md §5/§2 if starting fresh):
-1. **README** — still just a one-line title. Needs: justified technical choices, answers to pf.md §4
-   reflection questions (Q1 granularité chunking — mention the L1234-1 retrieval-rank finding above, Q2
-   traçabilité, Q3 fraîcheur, Q4 réponses conditionnelles, Q5 frontière conseil juridique), install/run
-   instructions (mention running `python data_prep/code_cli.py` — direct script, not `-m` — before first
-   `api.py`/`cli.py` launch since `data/` is gitignored).
-2. **Compte rendu (one page)** — difficulties (lead with the L1234-1 retrieval finding), design decisions,
+1. **Compte rendu (one page)** — difficulties (lead with the L1234-1 retrieval finding), design decisions,
    what you'd do with more time (hybrid search / better embedding model, given the finding above). Doesn't
    exist anywhere in the repo yet.
-3. **config.py cleanup** — `CORPUS_PATH` (pointing at a CSV under `data/raw/` that the pipeline never
+2. **config.py cleanup** — `CORPUS_PATH` (pointing at a CSV under `data/raw/` that the pipeline never
    actually produces — only `PARSED_CORPUS_PATH`, the JSON, is real) is dead code, nothing references it
    post api.py fix. Also worth fixing while in there: `data_prep/`'s flat-import style only works via
-   direct script execution (`python data_prep/code_cli.py`), not `-m` — either document that constraint
-   clearly in the README or convert `data_prep/` to proper package-relative imports for consistency with
-   `src/`.
+   direct script execution (`python data_prep/code_cli.py`), not `-m` — this is now documented as a
+   constraint in the README rather than fixed; converting `data_prep/` to proper package-relative imports
+   for consistency with `src/` is still on the table if there's time.
 
 ## Fraîcheur / corpus date (Q3, unresolved design question)
 
