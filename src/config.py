@@ -5,19 +5,12 @@ import re
 
 load_dotenv()
 
-
+# API Key for GROQ
 GROQ_API_KEY=os.environ["GROQ_API_KEY"]
 
+# Path configuration
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROMPTS_DIR = BASE_DIR / "prompts"
-
-EMBEDDING_MODEL="distiluse-base-multilingual-cased-v2"
-LLM_MODEL="openai/gpt-oss-120b"
-MODERATOR_MODEL="openai/gpt-oss-safeguard-20b"
-MODERATOR_SYSTEM_PROMPT_PATH = PROMPTS_DIR / "moderator_system.txt"
-RAG_PROMPT_SYSTEM_PATH = PROMPTS_DIR / "rag_prompt_system.txt"
-CORPUS_PATH = BASE_DIR / "05_corpus_rag.csv"
-VECTOR_DB_PATH = BASE_DIR / "my_vector_db"
 
 # Legifrance config
 SOURCE_URL_TEMPLATE = (
@@ -38,3 +31,21 @@ SECTION_PATTERNS = [
         ("section", re.compile(r"^\s*Section\b", re.IGNORECASE)),
         ("sous_section", re.compile(r"^\s*Sous-section\b", re.IGNORECASE)),
     ]
+# Database config
+CORPUS_PATH = BASE_DIR / "data" / "raw" / "code_travail_corpus.csv"
+
+PARSED_CORPUS_PATH = BASE_DIR / "data" / "corpus_code_travail.json"
+
+EMBEDDING_MODEL="distiluse-base-multilingual-cased-v2"
+
+LLM_MODEL="openai/gpt-oss-120b"
+
+MODERATOR_MODEL="openai/gpt-oss-safeguard-20b"
+
+MODERATOR_SYSTEM_PROMPT_PATH = PROMPTS_DIR / "moderator_system.txt"
+
+RAG_PROMPT_SYSTEM_PATH = PROMPTS_DIR / "rag_prompt_system.txt"
+
+# CORPUS_PATH = BASE_DIR / "05_corpus_rag.csv"
+
+VECTOR_DB_PATH = BASE_DIR / "my_vector_db"

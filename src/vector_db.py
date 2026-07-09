@@ -1,30 +1,32 @@
 import sys
 from pathlib import Path
+import json
 
 if __name__ == "__main__":
 	sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import chromadb
 from sentence_transformers import SentenceTransformer
-from src.config import CORPUS_PATH, EMBEDDING_MODEL, VECTOR_DB_PATH
+from src.config import EMBEDDING_MODEL, VECTOR_DB_PATH, PARSED_CORPUS_PATH
 
 import os
-import pandas
 
 class VectorDB:
-	def __init__(self, vector_db_path="", corpus_df=None):
+	def __init__(self, vector_db_path="", corpus_dict=None):
 		if os.path.exists(vector_db_path):
 			self.load_vector_db(vector_db_path)
 
-
-		elif not corpus_df.empty:
-			self.create_vector_db(vector_db_path, corpus_df)
+		elif not corpus_dict:
+			raise ValueError("Aucun chunk n'a été fourni pour créer la base de données vectorielle.")
+		
+		else:
+			self.create_vector_db(vector_db_path, corpus_dict)
 
 
 	def load_vector_db(self, vector_db_path):
 		print("Loading Vector DB")
 		self.chroma_vector_db = chromadb.PersistentClient(path=vector_db_path)
-		collection = self.chroma_vector_db.get_collection(name="rag_knowledge")
+		collection = self.chroma_vector_db.get_collection(name="code_travail_rag_knowledge")
 
 		if "embedding_model" in collection.metadata.keys():
 			self.sentence_transformers_object = SentenceTransformer(collection.metadata["embedding_model"])
@@ -32,31 +34,54 @@ class VectorDB:
 			raise(Exception("Error : we miss the embeddings model's name information"))
 
 	
-	def create_vector_db(self, vector_db_path, corpus_df):
+	def create_vector_db(self, vector_db_path, corpus_dict):
 		print("Creating Vector DB")
 		self.sentence_transformers_object = SentenceTransformer(EMBEDDING_MODEL)
 
 		self.chroma_vector_db = chromadb.PersistentClient(path=vector_db_path)
 
 		collection = self.chroma_vector_db.get_or_create_collection(
-			name="rag_knowledge",
+			name="code_travail_rag_knowledge",
 			metadata={
 				"embedding_model": EMBEDDING_MODEL
 			}
 		)
 
-		chuncks = list(corpus_df["text"].values)
+		print("Calcul des embeddings en cours...")
+		texts = [chunk["text"] for chunk in corpus_dict]
+		embeddings = self.get_embeddings(texts)
 
-		embeddings = self.get_embeddings(chuncks)
+		# 1. Préparation de toutes les listes
+		ids = [chunk["id"] for chunk in corpus_dict]
+		metadatas = [
+			{
+				"id": chunk["id"],
+				"code": chunk.get("code", "Code du travail"),
+				"source": chunk.get("source", "Inconnue"),
+				"categorie": chunk.get("categorie", "Inconnue"),
+				"num": chunk.get("num") if chunk.get("num") is not None else "",
+				"cid": chunk.get("cid") if chunk.get("cid") is not None else "",
+				"etat": chunk.get("etat", "Inconnue"),
+				"date_debut_vigueur": int(chunk["date_debut_vigueur"]) if chunk.get("date_debut_vigueur") is not None else 0,
+				"date_fin_vigueur": int(chunk["date_fin_vigueur"]) if chunk.get("date_fin_vigueur") is not None else 0,
+				"url": chunk.get("url") if chunk.get("url") is not None else ""
+			}
+			for chunk in corpus_dict
+		]
 
-		collection.add(
-			ids = list(corpus_df["id"].values),
-			documents=chuncks,
-			embeddings=embeddings,
-			metadatas=[{"source": row["source"] , "category": row["categorie"]} for _, row in corpus_df.iterrows()]
+		# 2. Insertion par lots (batches) pour éviter la limite de 5461 de ChromaDB
+		batch_size = 5000 
+		print(f"Insertion de {len(ids)} chunks dans ChromaDB par lots de {batch_size}...")
+		
+		for i in range(0, len(ids), batch_size):
+			end_idx = i + batch_size
+			collection.add(
+				ids=ids[i:end_idx],
+				documents=texts[i:end_idx],
+				embeddings=embeddings[i:end_idx],
+				metadatas=metadatas[i:end_idx]
 			)
-
-
+			print(f"  -> Batch inséré : {min(end_idx, len(ids))}/{len(ids)}")
 
 	def get_embeddings(self, chuncks):
 		embeddings = self.sentence_transformers_object.encode(
@@ -66,24 +91,46 @@ class VectorDB:
 			show_progress_bar=True
 		).tolist()
 		return embeddings
+	
+	def retrieve(self, question: str, n: int = 5) -> list:
+		"""Encode la question et extrait les n chunks les plus proches."""
+		query_vector = self.get_embeddings(question)
+		collection = self.chroma_vector_db.get_collection("code_travail_rag_knowledge")
+		results = collection.query(
+            query_embeddings=[query_vector],
+            n_results=n
+        )
+		formatted_results = self._format_chroma_results(results)
+		return formatted_results
+	
+	def _format_chroma_results(self, results: dict) -> list[dict]:
+    	# On extrait la première liste (index 0) car Chroma renvoie une liste de listes (batch)
+		documents = results.get("documents", [[]])[0] if results.get("documents") else []
+		metadatas = results.get("metadatas", [[]])[0] if results.get("metadatas") else []
+		
+		formatted_results = []
 
-
-
-	def retrieve(self, question, n=3):
-		embedded_question = self.get_embeddings([question])
-
-		collection = self.chroma_vector_db.get_collection("rag_knowledge")
-
-		results = collection.query(query_embeddings=embedded_question, n_results=n)
-
-		return results["documents"][0], results["metadatas"][0]
+		for text, meta in zip(documents, metadatas):
+			meta = meta or {}
+			formatted_results.append({
+				"text": text,
+				"id": meta.get("id", "Inconnue"),
+				"code": meta.get("code", "Inconnue"),
+				"source": meta.get("source", "Inconnue"),
+				"categorie": meta.get("categorie", "Inconnue"),
+				"num": meta.get("num"),                     # Renvoie None s'il n'existe pas
+				"cid": meta.get("cid"),                     # Renvoie None s'il n'existe pas
+				"etat": meta.get("etat", "Inconnue"),
+				"date_debut_vigueur": meta.get("date_debut_vigueur"),
+				"date_fin_vigueur": meta.get("date_fin_vigueur"),
+				"url": meta.get("url")
+			})
+		return formatted_results
 
 
 
 if __name__ == "__main__":
-	corpus_df=pandas.read_csv(CORPUS_PATH)
-
-	vector_db_object = VectorDB(str(VECTOR_DB_PATH), corpus_df)
-
-
-	print(vector_db_object.retrieve(question="Quelle est la coleur et le nom du chat de Bob ?"))
+	with open(PARSED_CORPUS_PATH, "r", encoding="utf-8") as f:
+		corpus_dict = json.load(f)
+	vector_db_object = VectorDB(str(VECTOR_DB_PATH), corpus_dict)
+	print(vector_db_object.retrieve(question="Combien d'heures de travail sont necéssaire pour le SMIC?"))
