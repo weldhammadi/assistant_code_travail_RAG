@@ -5,6 +5,8 @@ __pycache__/
 
 # Persistent vector DB (generated from the corpus, not source)
 /my_vector_db/
+# Temporary rebuild directories created by the daily auto-refresh (src/auto_refresh.py)
+/my_vector_db_refresh_*/
 
 # C extensions
 *.so
