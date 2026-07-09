@@ -68,7 +68,21 @@ uvicorn api:app --reload
 ```
 
 Puis ouvrir `http://127.0.0.1:8000`. Même moteur (`src/rag.py`) que la CLI, via une petite UI HTML/CSS/JS
-statique (`static/index.html`) et un unique endpoint `POST /ask`. Déployable telle quelle (`Procfile` fourni).
+statique (`static/index.html`) et un unique endpoint `POST /ask`.
+
+**Déploiement (Railway)** : `Procfile` + `railway.json` sont fournis. Comme `data/` et `my_vector_db/`
+sont gitignored, un conteneur fraîchement déployé n'a ni l'un ni l'autre — `src/bootstrap.py` gère ça
+automatiquement au démarrage (télécharge + parse + indexe si rien n'existe), mais ce premier boot prend
+plusieurs minutes (surtout le calcul des embeddings), d'où le `healthcheckTimeout` étendu dans
+`railway.json`. Pour ne pas refaire ce travail à chaque déploiement, montez un volume persistant et
+pointez-y ces deux variables d'environnement :
+
+```
+DATA_DIR=/chemin/vers/le/volume/data
+VECTOR_DB_PATH=/chemin/vers/le/volume/my_vector_db
+```
+
+(en plus de `GROQ_API_KEY`). Sans volume monté, chaque redéploiement reconstruit tout depuis zéro.
 
 ### 4. Valider le retrieval (Jalon 3, avant tout appel LLM)
 
