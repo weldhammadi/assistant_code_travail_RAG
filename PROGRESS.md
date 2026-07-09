@@ -95,27 +95,46 @@ Fixed this session: legal disclaimer now guaranteed in code (`Rag.DISCLAIMER`, a
 (were still calling a dead `corpus_df`/pandas/CSV API); `pandas` dropped from requirements.txt (no
 longer used anywhere after that fix).
 
+Done since the note above was written: CLI loop (`cli.py`, uses shared `src/bootstrap.py::ensure_vector_db_built`
+also now used by `api.py`), and Jalon 3's retrieval validation script (`evaluate_retrieval.py`).
+
+The real corpus has been downloaded and indexed for real (not just the mini test fixture):
+`python data_prep/code_cli.py` (run as a **direct script**, not `python -m data_prep.code_cli` — its
+internal imports are flat/non-package-relative, e.g. `from code_orchestrator import ...`, so `-m` fails
+with `ModuleNotFoundError`; worth fixing under the config-cleanup item below) produced
+`data/corpus_code_travail.json`: **11,710 chunks** (4,432 législatif / 7,213 réglementaire / 65 autre) —
+confirms the "≥5 themes" corpus-coverage requirement holds by construction, since it downloads the whole
+Code du travail rather than being theme-limited. `my_vector_db/` was then rebuilt from this real corpus
+(`EMBEDDING_MODEL` = distiluse-base-multilingual-cased-v2, ~8min to embed on CPU).
+
+**`evaluate_retrieval.py` real result: 4/5 pass.** The one failure is a genuine, worth-documenting finding
+(exactly what Jalon 3 is for): for "Quelle est la durée du préavis en cas de licenciement pour un salarié
+en CDI ?", the expected article `L1234-1` (the actual "durée du préavis" article) ranks **11th**, behind
+`R1234-4` (indemnité de licenciement salary calc) and `R1235-1` (chômage benefit reimbursement) at ranks
+1-2, and `L1234-6` (a related-but-different préavis sub-case) at rank 5. Tested and ruled out the
+breadcrumb-dilution hypothesis (stripping the repeated hierarchy prefix from `L1234-1`'s embedded text
+*lowered* cosine similarity to the query, 0.31 vs 0.36 — breadcrumb helps, isn't the cause). Root cause is
+embedding-model semantic imprecision on this specific French legal phrasing, not a chunking bug. Left
+undoctored (n stayed at the default 5 in `Rag.build_context`, since bumping k to e.g. 8 wouldn't reach
+rank 11 anyway) — **worth writing up in the README's Q1 answer and the compte rendu's "difficultés" /
+"avec plus de temps" sections** (candidate improvement: hybrid lexical+vector search, or a
+better/larger embedding model, or re-ranking).
+
 Still missing (see TodoWrite in active session, or re-derive from pf.md §5/§2 if starting fresh):
-1. **Interactive CLI loop** ("module d'interrogation" — pf.md §2 and Jalon 5 both require a CLI
-   question/answer REPL showing answer + source articles + disclaimer + clean exit. Currently only
-   `api.py` (web) and `rag.py`'s single hardcoded `__main__` question exist.
-2. **Retrieval validation script (Jalon 3)** — no script/test checks that, for ~5 known questions, the
-   expected article shows up in top-k, before the LLM was wired in. Should be built as a standalone
-   script/test using the real corpus (not the mini fixture) once it's been downloaded locally.
-3. **README** — still just a one-line title. Needs: justified technical choices, answers to pf.md §4
-   reflection questions (Q1 granularité chunking, Q2 traçabilité, Q3 fraîcheur, Q4 réponses
-   conditionnelles, Q5 frontière conseil juridique), install/run instructions (mention running
-   `data_prep.code_cli` before first `api.py` launch since `data/` is gitignored).
-4. **Compte rendu (one page)** — difficulties, design decisions, what you'd do with more time. Doesn't
+1. **README** — still just a one-line title. Needs: justified technical choices, answers to pf.md §4
+   reflection questions (Q1 granularité chunking — mention the L1234-1 retrieval-rank finding above, Q2
+   traçabilité, Q3 fraîcheur, Q4 réponses conditionnelles, Q5 frontière conseil juridique), install/run
+   instructions (mention running `python data_prep/code_cli.py` — direct script, not `-m` — before first
+   `api.py`/`cli.py` launch since `data/` is gitignored).
+2. **Compte rendu (one page)** — difficulties (lead with the L1234-1 retrieval finding), design decisions,
+   what you'd do with more time (hybrid search / better embedding model, given the finding above). Doesn't
    exist anywhere in the repo yet.
-5. **config.py cleanup** — `CORPUS_PATH` (pointing at a CSV under `data/raw/` that the pipeline never
-   actually produces — only `PARSED_CORPUS_PATH`, the JSON, is real) is dead code left over from before
-   the CSV->JSON rewrite. Should be removed once nothing references it (currently nothing does, post
-   api.py fix).
-6. Not yet verified: whether the full real downloaded corpus (`python -m data_prep.code_cli`) actually
-   covers ≥5 of the 8 themes pf.md lists — should download for real and spot-check once step 2 (Jalon 3
-   validation script) is built, since it downloads the whole Code du travail (not theme-limited) so this
-   should hold by construction, but hasn't been run end-to-end in this session.
+3. **config.py cleanup** — `CORPUS_PATH` (pointing at a CSV under `data/raw/` that the pipeline never
+   actually produces — only `PARSED_CORPUS_PATH`, the JSON, is real) is dead code, nothing references it
+   post api.py fix. Also worth fixing while in there: `data_prep/`'s flat-import style only works via
+   direct script execution (`python data_prep/code_cli.py`), not `-m` — either document that constraint
+   clearly in the README or convert `data_prep/` to proper package-relative imports for consistency with
+   `src/`.
 
 ## Fraîcheur / corpus date (Q3, unresolved design question)
 
