@@ -36,6 +36,8 @@ CORPUS_PATH = BASE_DIR / "data" / "raw" / "code_travail_corpus.csv"
 
 PARSED_CORPUS_PATH = BASE_DIR / "data" / "corpus_code_travail.json"
 
+CORPUS_META_PATH = BASE_DIR / "data" / "corpus_meta.json"
+
 EMBEDDING_MODEL="distiluse-base-multilingual-cased-v2"
 
 LLM_MODEL="openai/gpt-oss-120b"
