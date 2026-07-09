@@ -1,7 +1,7 @@
+import json
 import os
 from contextlib import asynccontextmanager
 
-import pandas
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -18,8 +18,14 @@ async def lifespan(app: FastAPI):
 	global rag
 
 	if not os.path.exists(config.VECTOR_DB_PATH):
-		corpus_df = pandas.read_csv(config.CORPUS_PATH)
-		VectorDB(vector_db_path=str(config.VECTOR_DB_PATH), corpus_df=corpus_df)
+		if not config.PARSED_CORPUS_PATH.exists():
+			raise RuntimeError(
+				f"Corpus introuvable ({config.PARSED_CORPUS_PATH}). "
+				"Lancez d'abord l'ingestion : python -m data_prep.code_cli"
+			)
+		with open(config.PARSED_CORPUS_PATH, "r", encoding="utf-8") as f:
+			corpus_dict = json.load(f)
+		VectorDB(vector_db_path=str(config.VECTOR_DB_PATH), corpus_dict=corpus_dict)
 
 	rag = Rag(vector_db_path=str(config.VECTOR_DB_PATH))
 	yield
