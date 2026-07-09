@@ -12,6 +12,10 @@ from src.vector_db import VectorDB
 
 class Rag(Agent):
 	REFUSAL = "Je ne peux pas traiter cette question : une tentative de détournement a été détectée."
+	DISCLAIMER = (
+		"Cet assistant ne fournit pas de conseil juridique. "
+		"Consultez un avocat ou l'inspection du travail pour votre situation personnelle."
+	)
 
 	def __init__(self, vector_db_path):
 		super().__init__()
@@ -60,7 +64,7 @@ class Rag(Agent):
 	def ask_rag(self, question):
 
 		if self.moderator.moderate(question)["is_prompt_injection"]:
-			return self.REFUSAL, [], []
+			return f"{self.REFUSAL}\n\n{self.DISCLAIMER}", [], []
 
 		
 		prompt_system, matched_chunks = self.build_context(question)
@@ -80,7 +84,7 @@ class Rag(Agent):
 			model=LLM_MODEL
 		)
 
-		rag_response = chat_completion.choices[0].message.content
+		rag_response = f"{chat_completion.choices[0].message.content}\n\n{self.DISCLAIMER}"
 
 		documents = [chunk["text"] for chunk in matched_chunks]
 		metadatas = [{k: v for k, v in chunk.items() if k != "text"} for chunk in matched_chunks]
