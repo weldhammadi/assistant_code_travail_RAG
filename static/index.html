@@ -1,196 +1,803 @@
-<title>Assistant RAG</title>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Assistant Code du travail — Questions sur le droit du travail français</title>
+<meta name="description" content="Assistant juridique qui répond à vos questions sur le droit du travail français en citant les articles du Code du travail." />
 <style>
 	:root {
 		color-scheme: light dark;
-		--bg: #f5f5f7;
+		--bg: #f4f5f8;
 		--surface: #ffffff;
-		--text: #1c1c1e;
-		--text-muted: #6e6e73;
-		--border: #d8d8dc;
-		--accent: #2f6fed;
+		--surface-2: #eef0f4;
+		--text: #1a1c22;
+		--text-muted: #5f6470;
+		--text-faint: #8b909c;
+		--border: #e0e2e8;
+		--accent: #000091;
+		--accent-hover: #1212c8;
+		--accent-soft: #ececfe;
 		--accent-text: #ffffff;
 		--bubble-user: var(--accent);
-		--bubble-assistant: #eceef1;
-		--bubble-refusal: #fde8e8;
-		--bubble-refusal-text: #8a2c2c;
+		--warn-bg: #fdecec;
+		--warn-text: #99303c;
+		--warn-border: #f5c2c7;
+		--ok-bg: #e8f5ec;
+		--ok-text: #1f6b3a;
+		--chip-bg: #f1f2f6;
+		--chip-hover: #e5e7ee;
+		--shadow: 0 1px 2px rgba(20, 22, 40, 0.05), 0 4px 16px rgba(20, 22, 40, 0.06);
+		--radius: 14px;
 	}
 
 	@media (prefers-color-scheme: dark) {
 		:root {
-			--bg: #1c1c1e;
-			--surface: #2c2c2e;
-			--text: #f2f2f7;
-			--text-muted: #9a9aa0;
-			--border: #3a3a3c;
-			--accent: #4c8dff;
-			--accent-text: #ffffff;
-			--bubble-user: var(--accent);
-			--bubble-assistant: #3a3a3c;
-			--bubble-refusal: #4a2626;
-			--bubble-refusal-text: #f5b5b5;
+			--bg: #14151a;
+			--surface: #1e2027;
+			--surface-2: #262933;
+			--text: #eceef2;
+			--text-muted: #9ba1ae;
+			--text-faint: #6f7480;
+			--border: #32353f;
+			--accent: #8585f6;
+			--accent-hover: #9d9dfb;
+			--accent-soft: #2a2a52;
+			--accent-text: #0e0e2e;
+			--bubble-user: #34349c;
+			--warn-bg: #3c2126;
+			--warn-text: #f1a7ae;
+			--warn-border: #5c3138;
+			--ok-bg: #1d3325;
+			--ok-text: #8fd3a5;
+			--chip-bg: #262933;
+			--chip-hover: #30343f;
+			--shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
 		}
 	}
 
-	* {
-		box-sizing: border-box;
-	}
+	* { box-sizing: border-box; }
 
-	html, body {
-		height: 100%;
-	}
+	html, body { height: 100%; }
 
 	body {
 		margin: 0;
-		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 		background: var(--bg);
 		color: var(--text);
 		display: flex;
-		justify-content: center;
-	}
-
-	main {
-		width: 100%;
-		max-width: 720px;
-		height: 100vh;
-		display: flex;
 		flex-direction: column;
+		font-size: 15px;
+		line-height: 1.55;
 	}
 
-	header {
-		padding: 1.25rem 1rem 0.75rem;
+	/* ---------- Header ---------- */
+
+	.site-header {
+		background: var(--surface);
 		border-bottom: 1px solid var(--border);
+		position: sticky;
+		top: 0;
+		z-index: 10;
 	}
 
-	header h1 {
+	.site-header .inner {
+		max-width: 860px;
+		margin: 0 auto;
+		padding: 0.85rem 1.25rem;
+		display: flex;
+		align-items: center;
+		gap: 0.85rem;
+	}
+
+	.logo {
+		flex: none;
+		width: 40px;
+		height: 40px;
+		border-radius: 10px;
+		background: var(--accent);
+		color: var(--accent-text);
+		display: grid;
+		place-items: center;
+	}
+
+	.logo svg { width: 22px; height: 22px; }
+
+	.brand { min-width: 0; }
+
+	.brand h1 {
 		margin: 0;
-		font-size: 1.1rem;
-		font-weight: 600;
+		font-family: Georgia, "Times New Roman", serif;
+		font-size: 1.15rem;
+		font-weight: 700;
+		letter-spacing: 0.01em;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
-	header p {
-		margin: 0.25rem 0 0.75rem;
-		font-size: 0.85rem;
+	.brand p {
+		margin: 0;
+		font-size: 0.78rem;
 		color: var(--text-muted);
 	}
 
-	#log {
+	.corpus-pill {
+		margin-left: auto;
+		flex: none;
+		font-size: 0.75rem;
+		padding: 0.3rem 0.7rem;
+		border-radius: 999px;
+		background: var(--ok-bg);
+		color: var(--ok-text);
+		border: 1px solid transparent;
+		display: none;
+		align-items: center;
+		gap: 0.35rem;
+	}
+
+	.corpus-pill.stale {
+		background: var(--warn-bg);
+		color: var(--warn-text);
+		border-color: var(--warn-border);
+	}
+
+	.corpus-pill .dot {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: currentColor;
+	}
+
+	@media (max-width: 560px) {
+		.corpus-pill .pill-detail { display: none; }
+	}
+
+	/* ---------- Chat area ---------- */
+
+	.chat-wrap {
 		flex: 1;
 		overflow-y: auto;
-		padding: 1rem;
+		scroll-behavior: smooth;
+	}
+
+	.chat {
+		max-width: 860px;
+		margin: 0 auto;
+		padding: 1.5rem 1.25rem 1rem;
 		display: flex;
 		flex-direction: column;
+		gap: 1.1rem;
+	}
+
+	/* Empty state */
+
+	.empty-state {
+		text-align: center;
+		padding: 8vh 1rem 2rem;
+		max-width: 620px;
+		margin: 0 auto;
+	}
+
+	.empty-state .badge {
+		width: 64px;
+		height: 64px;
+		border-radius: 18px;
+		background: var(--accent-soft);
+		color: var(--accent);
+		display: grid;
+		place-items: center;
+		margin: 0 auto 1.1rem;
+	}
+
+	.empty-state .badge svg { width: 34px; height: 34px; }
+
+	.empty-state h2 {
+		font-family: Georgia, "Times New Roman", serif;
+		font-size: 1.55rem;
+		margin: 0 0 0.5rem;
+	}
+
+	.empty-state > p {
+		color: var(--text-muted);
+		margin: 0 auto 1.75rem;
+		max-width: 46ch;
+	}
+
+	.suggestions {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.6rem;
+	}
+
+	@media (max-width: 560px) {
+		.suggestions { grid-template-columns: 1fr; }
+	}
+
+	.suggestion {
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--text);
+		border-radius: var(--radius);
+		padding: 0.8rem 1rem;
+		font-size: 0.87rem;
+		font-family: inherit;
+		text-align: left;
+		cursor: pointer;
+		transition: border-color 0.15s, background 0.15s, transform 0.1s;
+	}
+
+	.suggestion:hover {
+		border-color: var(--accent);
+		background: var(--surface-2);
+	}
+
+	.suggestion:active { transform: scale(0.985); }
+
+	/* Messages */
+
+	.msg-user {
+		align-self: flex-end;
+		max-width: 78%;
+		background: var(--bubble-user);
+		color: var(--accent-text);
+		padding: 0.65rem 1rem;
+		border-radius: var(--radius);
+		border-bottom-right-radius: 4px;
+		white-space: pre-wrap;
+		word-break: break-word;
+		box-shadow: var(--shadow);
+	}
+
+	@media (prefers-color-scheme: dark) {
+		.msg-user { color: #eceef2; }
+	}
+
+	.msg-assistant {
+		align-self: stretch;
+		display: flex;
 		gap: 0.75rem;
 	}
 
-	.message {
-		max-width: 85%;
-		padding: 0.6rem 0.9rem;
-		border-radius: 1rem;
-		line-height: 1.4;
-		white-space: pre-wrap;
+	.avatar {
+		flex: none;
+		width: 32px;
+		height: 32px;
+		border-radius: 9px;
+		background: var(--accent-soft);
+		color: var(--accent);
+		display: grid;
+		place-items: center;
+		margin-top: 2px;
+	}
+
+	.avatar svg { width: 18px; height: 18px; }
+
+	.card {
+		flex: 1;
+		min-width: 0;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		border-top-left-radius: 4px;
+		box-shadow: var(--shadow);
+		overflow: hidden;
+	}
+
+	.card .answer {
+		padding: 0.9rem 1.15rem;
 		word-break: break-word;
-		font-size: 0.95rem;
 	}
 
-	.message.user {
-		align-self: flex-end;
-		background: var(--bubble-user);
-		color: var(--accent-text);
-		border-bottom-right-radius: 0.25rem;
+	.card .answer > :first-child { margin-top: 0; }
+	.card .answer > :last-child { margin-bottom: 0; }
+	.card .answer p { margin: 0.6rem 0; }
+	.card .answer ul, .card .answer ol { margin: 0.5rem 0; padding-left: 1.4rem; }
+	.card .answer li { margin: 0.25rem 0; }
+	.card .answer h3, .card .answer h4 {
+		margin: 0.9rem 0 0.35rem;
+		font-size: 1rem;
+	}
+	.card .answer code {
+		background: var(--surface-2);
+		border-radius: 5px;
+		padding: 0.1em 0.35em;
+		font-size: 0.88em;
+	}
+	.card .answer table {
+		border-collapse: collapse;
+		margin: 0.6rem 0;
+		font-size: 0.9em;
+		display: block;
+		overflow-x: auto;
+		max-width: 100%;
+	}
+	.card .answer th, .card .answer td {
+		border: 1px solid var(--border);
+		padding: 0.35rem 0.6rem;
+		text-align: left;
+	}
+	.card .answer th { background: var(--surface-2); }
+
+	.card.refusal {
+		background: var(--warn-bg);
+		border-color: var(--warn-border);
+	}
+	.card.refusal .answer { color: var(--warn-text); }
+
+	.sources {
+		padding: 0.7rem 1.15rem 0.8rem;
+		border-top: 1px solid var(--border);
+		background: color-mix(in srgb, var(--surface-2) 45%, var(--surface));
 	}
 
-	.message.assistant {
-		align-self: flex-start;
-		background: var(--bubble-assistant);
-		color: var(--text);
-		border-bottom-left-radius: 0.25rem;
+	.sources .label {
+		font-size: 0.7rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.07em;
+		color: var(--text-faint);
+		margin-bottom: 0.45rem;
 	}
 
-	.message.refusal {
-		align-self: flex-start;
-		background: var(--bubble-refusal);
-		color: var(--bubble-refusal-text);
-		border-bottom-left-radius: 0.25rem;
-	}
-
-	.message.pending {
-		align-self: flex-start;
-		background: var(--bubble-assistant);
-		color: var(--text-muted);
-		font-style: italic;
-	}
-
-	form {
+	.source-list {
 		display: flex;
-		gap: 0.5rem;
-		padding: 1rem;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+
+	.source-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: 0.8rem;
+		padding: 0.28rem 0.65rem;
+		border-radius: 999px;
+		background: var(--chip-bg);
+		border: 1px solid var(--border);
+		color: var(--text);
+		text-decoration: none;
+		transition: background 0.15s, border-color 0.15s;
+	}
+
+	a.source-chip:hover {
+		background: var(--chip-hover);
+		border-color: var(--accent);
+	}
+
+	a.source-chip .ext {
+		color: var(--text-faint);
+		width: 11px;
+		height: 11px;
+	}
+
+	.disclaimer-note {
+		padding: 0.55rem 1.15rem;
+		border-top: 1px solid var(--border);
+		font-size: 0.76rem;
+		color: var(--text-faint);
+		display: flex;
+		gap: 0.45rem;
+		align-items: baseline;
+	}
+
+	.disclaimer-note svg {
+		flex: none;
+		width: 12px;
+		height: 12px;
+		transform: translateY(1.5px);
+	}
+
+	/* Typing indicator */
+
+	.typing {
+		display: inline-flex;
+		gap: 5px;
+		padding: 1rem 1.15rem;
+	}
+
+	.typing span {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--text-faint);
+		animation: pulse 1.2s ease-in-out infinite;
+	}
+
+	.typing span:nth-child(2) { animation-delay: 0.18s; }
+	.typing span:nth-child(3) { animation-delay: 0.36s; }
+
+	@keyframes pulse {
+		0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+		30% { opacity: 1; transform: translateY(-3px); }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.typing span { animation: none; opacity: 0.6; }
+		.chat-wrap { scroll-behavior: auto; }
+	}
+
+	/* ---------- Composer ---------- */
+
+	.composer-wrap {
+		background: var(--surface);
 		border-top: 1px solid var(--border);
 	}
 
-	textarea {
+	.composer {
+		max-width: 860px;
+		margin: 0 auto;
+		padding: 0.85rem 1.25rem 0.5rem;
+	}
+
+	.composer form {
+		display: flex;
+		align-items: flex-end;
+		gap: 0.55rem;
+		background: var(--bg);
+		border: 1px solid var(--border);
+		border-radius: 16px;
+		padding: 0.45rem 0.45rem 0.45rem 1rem;
+		transition: border-color 0.15s, box-shadow 0.15s;
+	}
+
+	.composer form:focus-within {
+		border-color: var(--accent);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+	}
+
+	.composer textarea {
 		flex: 1;
 		resize: none;
-		border: 1px solid var(--border);
-		border-radius: 0.75rem;
-		padding: 0.6rem 0.8rem;
+		border: none;
+		background: transparent;
+		color: var(--text);
 		font-size: 0.95rem;
 		font-family: inherit;
-		background: var(--surface);
-		color: var(--text);
-		min-height: 2.5rem;
-		max-height: 8rem;
+		line-height: 1.5;
+		padding: 0.45rem 0;
+		min-height: 1.5rem;
+		max-height: 9rem;
 	}
 
-	textarea:focus {
-		outline: 2px solid var(--accent);
-		outline-offset: 1px;
-	}
+	.composer textarea:focus { outline: none; }
+	.composer textarea::placeholder { color: var(--text-faint); }
 
-	button {
+	.composer button[type="submit"] {
+		flex: none;
+		width: 40px;
+		height: 40px;
 		border: none;
-		border-radius: 0.75rem;
-		padding: 0 1.1rem;
+		border-radius: 12px;
 		background: var(--accent);
 		color: var(--accent-text);
-		font-size: 0.95rem;
-		font-weight: 600;
 		cursor: pointer;
+		display: grid;
+		place-items: center;
+		transition: background 0.15s, transform 0.1s;
 	}
 
-	button:disabled {
-		opacity: 0.5;
-		cursor: default;
+	.composer button[type="submit"]:hover:not(:disabled) { background: var(--accent-hover); }
+	.composer button[type="submit"]:active:not(:disabled) { transform: scale(0.94); }
+	.composer button[type="submit"]:disabled { opacity: 0.45; cursor: default; }
+	.composer button[type="submit"] svg { width: 18px; height: 18px; }
+
+	.composer .hint {
+		text-align: center;
+		font-size: 0.72rem;
+		color: var(--text-faint);
+		margin: 0.5rem 0 0;
+	}
+
+	.site-footer {
+		max-width: 860px;
+		margin: 0 auto;
+		padding: 0 1.25rem 0.8rem;
+		text-align: center;
+		font-size: 0.72rem;
+		color: var(--text-faint);
 	}
 </style>
+</head>
+<body>
 
-<main>
-	<header>
-		<h1>Assistant RAG</h1>
-		<p>Pose une question sur la base de connaissances.</p>
-	</header>
-	<div id="log"></div>
-	<form id="form">
-		<textarea id="question" placeholder="Écris ta question…" rows="1" required></textarea>
-		<button id="submit" type="submit">Envoyer</button>
-	</form>
-</main>
+<header class="site-header">
+	<div class="inner">
+		<div class="logo" aria-hidden="true">
+			<!-- Balance de la justice -->
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M12 3v18M5 21h14M12 6l-6 1 3 7a4 4 0 0 1-6 0l3-7M12 6l6 1-3 7a4 4 0 0 0 6 0l-3-7" transform="translate(0,-1.5) scale(0.95) translate(0.6,1.2)"/>
+			</svg>
+		</div>
+		<div class="brand">
+			<h1>Assistant Code du travail</h1>
+			<p>Droit du travail français, avec les articles cités à l'appui</p>
+		</div>
+		<span class="corpus-pill" id="corpus-pill" title="">
+			<span class="dot" aria-hidden="true"></span>
+			<span id="corpus-pill-text"></span>
+		</span>
+	</div>
+</header>
+
+<div class="chat-wrap" id="chat-wrap">
+	<div class="chat" id="chat">
+		<div class="empty-state" id="empty-state">
+			<div class="badge" aria-hidden="true">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4 4.5v15z"/>
+					<path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>
+					<path d="M9 7h6M9 11h4"/>
+				</svg>
+			</div>
+			<h2>Posez votre question sur le droit du travail</h2>
+			<p>
+				Congés, préavis, durée du travail, licenciement… L'assistant répond en s'appuyant
+				exclusivement sur le Code du travail et cite les articles utilisés.
+			</p>
+			<div class="suggestions" id="suggestions">
+				<button type="button" class="suggestion">Quelle est la durée légale du travail hebdomadaire ?</button>
+				<button type="button" class="suggestion">À combien de jours de congés payés ai-je droit par an ?</button>
+				<button type="button" class="suggestion">Quel préavis dois-je respecter en cas de démission ?</button>
+				<button type="button" class="suggestion">Ai-je droit à une pause pendant ma journée de travail ?</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="composer-wrap">
+	<div class="composer">
+		<form id="form">
+			<textarea id="question" placeholder="Écrivez votre question…" rows="1" required
+				aria-label="Votre question sur le droit du travail"></textarea>
+			<button id="submit" type="submit" aria-label="Envoyer la question">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M12 19V5M5 12l7-7 7 7"/>
+				</svg>
+			</button>
+		</form>
+		<p class="hint">Entrée pour envoyer · Maj+Entrée pour un saut de ligne</p>
+	</div>
+	<footer class="site-footer">
+		Cet assistant ne fournit pas de conseil juridique. Pour votre situation personnelle,
+		consultez un avocat ou l'inspection du travail.
+	</footer>
+</div>
 
 <script>
-	const log = document.getElementById("log");
+	const chatWrap = document.getElementById("chat-wrap");
+	const chat = document.getElementById("chat");
+	const emptyState = document.getElementById("empty-state");
 	const form = document.getElementById("form");
 	const questionInput = document.getElementById("question");
 	const submitButton = document.getElementById("submit");
 
-	function addMessage(text, role) {
-		const bubble = document.createElement("div");
-		bubble.className = `message ${role}`;
-		bubble.textContent = text;
-		log.appendChild(bubble);
-		log.scrollTop = log.scrollHeight;
-		return bubble;
+	const DISCLAIMER =
+		"Cet assistant ne fournit pas de conseil juridique. " +
+		"Consultez un avocat ou l'inspection du travail pour votre situation personnelle.";
+	const REFUSAL_PREFIX = "Je ne peux pas traiter cette question";
+	const STALE_AFTER_DAYS = 180;
+
+	const ICON_INFO =
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' +
+		'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+	const ICON_EXT =
+		'<svg class="ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+		'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>';
+	const ICON_SCALE =
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+		'<path d="M12 3v18M5 21h14M12 6l-6 1 3 7a4 4 0 0 1-6 0l3-7M12 6l6 1-3 7a4 4 0 0 0 6 0l-3-7" transform="translate(0,-1.5) scale(0.95) translate(0.6,1.2)"/></svg>';
+
+	/* --- Bandeau de fraîcheur du corpus (Q3), même logique que la CLI --- */
+
+	(async function loadCorpusMeta() {
+		try {
+			const response = await fetch("/meta");
+			if (!response.ok) return;
+			const meta = await response.json();
+			if (!meta.generated_at) return;
+
+			const generated = new Date(meta.generated_at + "T00:00:00");
+			const ageDays = Math.floor((Date.now() - generated.getTime()) / 86400000);
+			const dateText = generated.toLocaleDateString("fr-FR");
+
+			const pill = document.getElementById("corpus-pill");
+			const pillText = document.getElementById("corpus-pill-text");
+			let text = `Corpus du ${dateText}`;
+			if (meta.chunk_count) {
+				text += `<span class="pill-detail"> · ${meta.chunk_count.toLocaleString("fr-FR")} articles</span>`;
+			}
+			pillText.innerHTML = text;
+
+			if (ageDays > STALE_AFTER_DAYS) {
+				pill.classList.add("stale");
+				pill.title =
+					`Ce corpus a ${ageDays} jours. Le droit du travail évolue : pour un sujet sensible, ` +
+					"vérifiez qu'aucune réforme récente n'a modifié les articles cités.";
+			} else {
+				pill.title = "Date de téléchargement du Code du travail utilisé par l'assistant.";
+			}
+			pill.style.display = "inline-flex";
+		} catch {
+			/* pas bloquant : le bandeau est purement informatif */
+		}
+	})();
+
+	/* --- Rendu Markdown minimal et sûr (échappement HTML d'abord) --- */
+
+	function escapeHtml(text) {
+		return text
+			.replaceAll("&", "&amp;")
+			.replaceAll("<", "&lt;")
+			.replaceAll(">", "&gt;")
+			.replaceAll('"', "&quot;");
 	}
+
+	function renderInline(text) {
+		return text
+			.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+			.replace(/`([^`]+)`/g, "<code>$1</code>")
+			.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+				'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+	}
+
+	function renderMarkdown(raw) {
+		const lines = escapeHtml(raw).split("\n");
+		const html = [];
+		let list = null; // "ul" | "ol" | null
+		let paragraph = [];
+
+		function closeList() {
+			if (list) { html.push(`</${list}>`); list = null; }
+		}
+		function closeParagraph() {
+			if (paragraph.length) {
+				html.push(`<p>${renderInline(paragraph.join("<br>"))}</p>`);
+				paragraph = [];
+			}
+		}
+
+		for (const line of lines) {
+			const trimmed = line.trim();
+
+			if (!trimmed) { closeParagraph(); closeList(); continue; }
+
+			const heading = trimmed.match(/^(#{1,4})\s+(.*)$/);
+			if (heading) {
+				closeParagraph(); closeList();
+				const level = Math.min(heading[1].length + 2, 4);
+				html.push(`<h${level}>${renderInline(heading[2])}</h${level}>`);
+				continue;
+			}
+
+			const bullet = trimmed.match(/^[-*•]\s+(.*)$/);
+			if (bullet) {
+				closeParagraph();
+				if (list !== "ul") { closeList(); html.push("<ul>"); list = "ul"; }
+				html.push(`<li>${renderInline(bullet[1])}</li>`);
+				continue;
+			}
+
+			const numbered = trimmed.match(/^\d+[.)]\s+(.*)$/);
+			if (numbered) {
+				closeParagraph();
+				if (list !== "ol") { closeList(); html.push("<ol>"); list = "ol"; }
+				html.push(`<li>${renderInline(numbered[1])}</li>`);
+				continue;
+			}
+
+			closeList();
+			paragraph.push(trimmed);
+		}
+		closeParagraph();
+		closeList();
+		return html.join("");
+	}
+
+	/* --- Construction des messages --- */
+
+	function scrollToBottom() {
+		chatWrap.scrollTop = chatWrap.scrollHeight;
+	}
+
+	function hideEmptyState() {
+		if (emptyState) emptyState.style.display = "none";
+	}
+
+	function addUserMessage(text) {
+		const bubble = document.createElement("div");
+		bubble.className = "msg-user";
+		bubble.textContent = text;
+		chat.appendChild(bubble);
+		scrollToBottom();
+	}
+
+	function assistantShell() {
+		const row = document.createElement("div");
+		row.className = "msg-assistant";
+
+		const avatar = document.createElement("div");
+		avatar.className = "avatar";
+		avatar.setAttribute("aria-hidden", "true");
+		avatar.innerHTML = ICON_SCALE;
+
+		const card = document.createElement("div");
+		card.className = "card";
+
+		row.appendChild(avatar);
+		row.appendChild(card);
+		chat.appendChild(row);
+		scrollToBottom();
+		return { row, card };
+	}
+
+	function addTypingIndicator() {
+		const { row, card } = assistantShell();
+		card.innerHTML = '<div class="typing" role="status" aria-label="L\'assistant rédige une réponse">' +
+			"<span></span><span></span><span></span></div>";
+		return row;
+	}
+
+	function addAssistantMessage(answer, sources, { isError = false } = {}) {
+		const { card } = assistantShell();
+
+		let body = answer;
+		let hasDisclaimer = false;
+		if (body.endsWith(DISCLAIMER)) {
+			body = body.slice(0, -DISCLAIMER.length).trim();
+			hasDisclaimer = true;
+		}
+
+		const isRefusal = isError || body.startsWith(REFUSAL_PREFIX);
+		if (isRefusal) card.classList.add("refusal");
+
+		const answerDiv = document.createElement("div");
+		answerDiv.className = "answer";
+		answerDiv.innerHTML = renderMarkdown(body);
+		card.appendChild(answerDiv);
+
+		if (sources && sources.length) {
+			const sourcesDiv = document.createElement("div");
+			sourcesDiv.className = "sources";
+			const label = document.createElement("div");
+			label.className = "label";
+			label.textContent = "Articles cités en contexte";
+			sourcesDiv.appendChild(label);
+
+			const listDiv = document.createElement("div");
+			listDiv.className = "source-list";
+			for (const src of sources) {
+				const name = src.num ? `Art. ${src.num}` : "Article inconnu";
+				let chip;
+				if (src.url) {
+					chip = document.createElement("a");
+					chip.href = src.url;
+					chip.target = "_blank";
+					chip.rel = "noopener noreferrer";
+					chip.title = `Consulter l'article ${src.num || ""} sur Légifrance`.trim();
+					chip.innerHTML = escapeHtml(name) + ICON_EXT;
+				} else {
+					chip = document.createElement("span");
+					chip.textContent = name;
+				}
+				chip.className = "source-chip";
+				listDiv.appendChild(chip);
+			}
+			sourcesDiv.appendChild(listDiv);
+			card.appendChild(sourcesDiv);
+		}
+
+		if (hasDisclaimer) {
+			const note = document.createElement("div");
+			note.className = "disclaimer-note";
+			note.innerHTML = ICON_INFO + "<span>" + escapeHtml(DISCLAIMER) + "</span>";
+			card.appendChild(note);
+		}
+
+		scrollToBottom();
+	}
+
+	/* --- Saisie --- */
 
 	questionInput.addEventListener("input", () => {
 		questionInput.style.height = "auto";
@@ -204,20 +811,26 @@
 		}
 	});
 
+	document.getElementById("suggestions").addEventListener("click", (event) => {
+		const button = event.target.closest(".suggestion");
+		if (!button) return;
+		questionInput.value = button.textContent.trim();
+		form.requestSubmit();
+	});
+
 	form.addEventListener("submit", async (event) => {
 		event.preventDefault();
 
 		const question = questionInput.value.trim();
-		if (!question) {
-			return;
-		}
+		if (!question || submitButton.disabled) return;
 
-		addMessage(question, "user");
+		hideEmptyState();
+		addUserMessage(question);
 		questionInput.value = "";
 		questionInput.style.height = "auto";
 		submitButton.disabled = true;
 
-		const pendingBubble = addMessage("…", "pending");
+		const typingRow = addTypingIndicator();
 
 		try {
 			const response = await fetch("/ask", {
@@ -231,14 +844,22 @@
 			}
 
 			const data = await response.json();
-			pendingBubble.remove();
-			addMessage(data.answer, "assistant");
-		} catch (error) {
-			pendingBubble.remove();
-			addMessage("Une erreur est survenue, réessaie dans un instant.", "refusal");
+			typingRow.remove();
+			addAssistantMessage(data.answer, data.sources || []);
+		} catch {
+			typingRow.remove();
+			addAssistantMessage(
+				"Une erreur est survenue lors du traitement de votre question. Réessayez dans un instant.",
+				[],
+				{ isError: true }
+			);
 		} finally {
 			submitButton.disabled = false;
 			questionInput.focus();
 		}
 	});
+
+	questionInput.focus();
 </script>
+</body>
+</html>
