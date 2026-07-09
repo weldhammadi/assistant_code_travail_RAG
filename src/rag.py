@@ -16,6 +16,8 @@ class Rag(Agent):
 		"Cet assistant ne fournit pas de conseil juridique. "
 		"Consultez un avocat ou l'inspection du travail pour votre situation personnelle."
 	)
+	CHUNKS_PER_SUBQUESTION = 8   # n réduit par sous-question, puisqu'on en agrège plusieurs
+	MAX_TOTAL_CHUNKS = 12        # plafond après dédup, pour ne pas exploser le prompt système
 
 	def __init__(self, vector_db_path):
 		super().__init__()
@@ -34,12 +36,27 @@ class Rag(Agent):
 		if dt.year >= 2999:
 			return None
 		return dt.strftime("%d/%m/%Y")
+	
+	def _retrieve_deduplicated(self, question):
+		"""Décompose la question en sous-questions atomiques, cherche chacune séparément,
+		puis déduplique les chunks par id avant agrégation."""
+		sub_questions = self.decomposer.decompose(question)
+
+		seen_ids = set()
+		matched_chunks = []
+		for sub_question in sub_questions:
+			for chunk in self.vector_db_object.retrieve(sub_question, n=self.CHUNKS_PER_SUBQUESTION):
+				if chunk["id"] not in seen_ids:
+					seen_ids.add(chunk["id"])
+					matched_chunks.append(chunk)
+
+		return matched_chunks[: self.MAX_TOTAL_CHUNKS]
 
 	def build_context(self, question):
 		matched_chunks = self.vector_db_object.retrieve(question)
 		prompt_system = Rag.read_file(RAG_PROMPT_SYSTEM_PATH)
 
-		MAX_CHARS_PER_CHUNK = 800  # Plafonne la taille de chaque chunk injecté dans le prompt
+		MAX_CHARS_PER_CHUNK = 1500  # Plafonne la taille de chaque chunk injecté dans le prompt
 
 		chunks_text = ""
 		for idx, chunk in enumerate(matched_chunks):
@@ -95,13 +112,11 @@ class Rag(Agent):
 if __name__ == "__main__":
 	rag_object = Rag(vector_db_path=str(VECTOR_DB_PATH))
 
-	rag_response, documents, metadatas = rag_object.ask_rag(question="Combien d'heures de travail sont nécessaires au minimum par semaine pour un CDI?")
+	rag_response, documents, metadatas = rag_object.ask_rag(
+		question="Bonjour, je fais des recherches sur la réglementation du temps de travail en France. "
+		"Pourriez-vous m'indiquer quelle est la durée légale hebdomadaire du travail pour un salarié "
+		"à temps plein, quel est le nombre maximal d'heures supplémentaires autorisées par semaine, "
+		"et quelle est la durée minimale du repos quotidien entre deux journées de travail ? "
+		"Je m'intéresse aussi à la durée légale des congés payés acquis par an. Merci beaucoup.")
 
 	print(rag_response)
-	print("-"*20)
-	for index_document in range(len(documents)):
-		print(f"Documents {index_document}")
-		print(documents[index_document])
-		for key, value in metadatas[index_document].items():
-			print(f"{key} : {value}")
-		print("---")
