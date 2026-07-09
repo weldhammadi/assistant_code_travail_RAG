@@ -1,8 +1,139 @@
-# Progress Log
+# Project State — Assistant Code du travail (RAG)
 
-Tracks the step-by-step integration of the **moderator** into this RAG project, following the plan in [prep.md](prep.md). Workflow: one step implemented at a time, user commits/pushes to GitHub after each step before the next one starts.
+This file is the source of truth for where the project stands. Read this instead of re-deriving
+project state from scratch each session. The spec is [pf.md](pf.md) (M2 MD5 assignment, 2026).
 
-Repo structure: originally a flat layout (`agent.py`, `config.py`, `rag.py`, `vector_db.py` at root) — steps 1-5 below were built that way. A structural refactor (see bottom of log) later moved code into `src/`, prompts into `prompts/`, keeping `tests/` as-is; file links in the early log entries point at the paths as they were at the time, not necessarily where they live now.
+## What this project is
+
+A RAG assistant answering French labour-law ("Code du travail") questions, citing article numbers,
+refusing to answer outside its corpus, and always appending a legal disclaimer. Built without
+LangChain/LlamaIndex (forbidden by the assignment) — every brick (chunking, embeddings, vector store,
+prompt, LLM call) is hand-rolled.
+
+Note: this repo started life as a smaller "mini-TP" demo project (fictional corpus about "Bob's cat" —
+`05_corpus_rag.csv`, still present at repo root but unused/dead). It was pivoted to the real Code du
+travail project via the `feature/integrate-new-data` branch (data_prep/ pipeline + real vector_db.py
+rewrite). The historical log below (from the mini-TP phase) is kept for context but paths/behavior it
+describes may no longer match current code.
+
+## Architecture
+
+```
+data_prep/              # Jalon 1 — ingestion pipeline (not a package import path at runtime; run as scripts)
+  code_downloader.py     CodeTravailDownloader: downloads+caches raw Légifrance JSON (SocialGouv/legi-data mirror)
+  code_parser.py          CodeTravailParser: walks the JSON tree -> flat list of Chunk (one per article,
+                           split on paragraph boundaries if > max_chars). Builds breadcrumb hierarchy,
+                           infers categorie (legislatif/reglementaire/autre), dedupes ids.
+  chunk_structure.py      Chunk dataclass: id, text, code, source, categorie, num, cid, etat,
+                           date_debut_vigueur, date_fin_vigueur, url
+  code_orchestrator.py    CodeOrchestrator: download -> parse -> write JSON corpus + summary print
+  code_cli.py              CLI entrypoint (argparse) -> python -m data_prep.code_cli (or run directly)
+                           writes to data/corpus_code_travail.json by default (data/ is gitignored)
+
+src/                     # package (absolute imports `from src.x import y`, sys.path bootstrap for direct run)
+  config.py               env (GROQ_API_KEY), paths (BASE_DIR, PROMPTS_DIR, CORPUS_PATH [dead/unused],
+                           PARSED_CORPUS_PATH, VECTOR_DB_PATH), Légifrance constants (SOURCE_URL_TEMPLATE,
+                           LEGI_TEXT_ID, SECTION_PATTERNS...), model names (EMBEDDING_MODEL,
+                           LLM_MODEL="openai/gpt-oss-120b", MODERATOR_MODEL="openai/gpt-oss-safeguard-20b")
+  agent.py                 Agent: thin Groq client wrapper + static read_file helper
+  moderator.py              Moderator(Agent): prompt-injection classifier, JSON output {is_prompt_injection}
+  vector_db.py              VectorDB: create_vector_db (embed+persist to Chroma, batched inserts,
+                           embedding model name stored in collection metadata) / load_vector_db
+                           (reload without reindexing — checked via os.path.exists(vector_db_path), NOTE:
+                           a pre-created-but-empty directory will wrongly look "existing" — see tests/test_rag.py
+                           fixture workaround). retrieve(question, n=5) -> list[dict] (NOT a tuple).
+  rag.py                    Rag(Agent): build_context() formats retrieved chunks with [Article N] labels
+                           into the system prompt; ask_rag() moderates first (refuses+disclaimer, no LLM/
+                           retrieval call if flagged), else retrieves -> LLM call (temp=0) -> appends
+                           Rag.DISCLAIMER to every response path. Rag.REFUSAL / Rag.DISCLAIMER are class
+                           constants.
+
+prompts/
+  rag_prompt_system.txt    Code-du-travail-specific: citation obligation, refusal wording ("je ne trouve
+                           pas cette information dans ma base"), multi-part question handling, conditional
+                           answer caveats (Q4), legal-advice boundary (Q5), explicitly told NOT to
+                           self-append a disclaimer (code guarantees it instead).
+  moderator_system.txt     Code-du-travail-specific injection-detection prompt (domain description fixed,
+                           no longer references the old "Bob's cat" demo).
+
+api.py                   FastAPI app. lifespan: if VECTOR_DB_PATH missing, builds it from
+                           PARSED_CORPUS_PATH JSON (raises clear RuntimeError telling user to run
+                           data_prep.code_cli first if that JSON is also missing) via
+                           VectorDB(corpus_dict=...). GET / serves static/index.html. POST /ask ->
+                           {"answer": str} (disclaimer already baked into the string by Rag.ask_rag).
+static/index.html        vanilla HTML/CSS/JS chat UI, no build step.
+Procfile                  web: uvicorn api:app --host 0.0.0.0 --port $PORT
+
+tests/
+  conftest.py               sys.path bootstrap (repo root + data_prep/) + mini_corpus fixture
+                           (scope="module" — required because test_rag.py's module-scoped `rag` fixture
+                           depends on it; a function-scoped fixture would ScopeMismatch-error).
+  fixtures/mini_corpus.json  4 fake-but-realistic chunks (TEST-PREAVIS, TEST-CONGES, TEST-RUPTURE,
+                           TEST-SMIC), one per topic, used by test_vector_db/test_rag/test_api instead of
+                           requiring a real Légifrance download for every test run. IDs are deliberately
+                           fake (TEST-*) so nobody mistakes fixture text for real law.
+  test_vector_db.py, test_rag.py, test_api.py   rewritten this session (see log) to match the current
+                           VectorDB(corpus_dict=...) / retrieve()->list[dict] API — the old versions
+                           called a corpus_df/pandas/CSV signature that no longer exists.
+  test_code_*.py            cover data_prep/ (downloader/parser/orchestrator) — pre-existing, untouched.
+  test_agent.py, test_config.py, test_moderator.py   pre-existing, mostly untouched (test_moderator.py's
+                           example question swapped from "Bob's cat" to a labour-law question).
+
+All 29 tests pass with real Groq calls + real embeddings (no mocking, per this repo's established style;
+GROQ_API_KEY is present in .env). Full suite runtime ~60s.
+```
+
+## Status against pf.md (as of this session)
+
+Done: Jalon 1 (ingestion), Jalon 2 (chunking+indexation+persistence, embedding model tracked), Jalon 6
+bonus (moderator = "agent modérateur" improvement), git workflow (main/dev/feature+PRs already in git log).
+
+Fixed this session: legal disclaimer now guaranteed in code (`Rag.DISCLAIMER`, appended to every
+`ask_rag` return path — refusal and normal answer alike) rather than left to the LLM to remember;
+`rag_prompt_system.txt`/`moderator_system.txt` rewritten for the real domain; `api.py` + `test_api.py`/
+`test_vector_db.py`/`test_rag.py` fixed to match the current `VectorDB(corpus_dict=...)` signature
+(were still calling a dead `corpus_df`/pandas/CSV API); `pandas` dropped from requirements.txt (no
+longer used anywhere after that fix).
+
+Still missing (see TodoWrite in active session, or re-derive from pf.md §5/§2 if starting fresh):
+1. **Interactive CLI loop** ("module d'interrogation" — pf.md §2 and Jalon 5 both require a CLI
+   question/answer REPL showing answer + source articles + disclaimer + clean exit. Currently only
+   `api.py` (web) and `rag.py`'s single hardcoded `__main__` question exist.
+2. **Retrieval validation script (Jalon 3)** — no script/test checks that, for ~5 known questions, the
+   expected article shows up in top-k, before the LLM was wired in. Should be built as a standalone
+   script/test using the real corpus (not the mini fixture) once it's been downloaded locally.
+3. **README** — still just a one-line title. Needs: justified technical choices, answers to pf.md §4
+   reflection questions (Q1 granularité chunking, Q2 traçabilité, Q3 fraîcheur, Q4 réponses
+   conditionnelles, Q5 frontière conseil juridique), install/run instructions (mention running
+   `data_prep.code_cli` before first `api.py` launch since `data/` is gitignored).
+4. **Compte rendu (one page)** — difficulties, design decisions, what you'd do with more time. Doesn't
+   exist anywhere in the repo yet.
+5. **config.py cleanup** — `CORPUS_PATH` (pointing at a CSV under `data/raw/` that the pipeline never
+   actually produces — only `PARSED_CORPUS_PATH`, the JSON, is real) is dead code left over from before
+   the CSV->JSON rewrite. Should be removed once nothing references it (currently nothing does, post
+   api.py fix).
+6. Not yet verified: whether the full real downloaded corpus (`python -m data_prep.code_cli`) actually
+   covers ≥5 of the 8 themes pf.md lists — should download for real and spot-check once step 2 (Jalon 3
+   validation script) is built, since it downloads the whole Code du travail (not theme-limited) so this
+   should hold by construction, but hasn't been run end-to-end in this session.
+
+## Fraîcheur / corpus date (Q3, unresolved design question)
+
+Not yet decided: how the system surfaces the corpus's download date / risk of obsolescence to the user.
+No code addresses this yet — needs a decision (e.g. stamp the download date into the vector DB collection
+metadata alongside `embedding_model`, surface it in the CLI/API). Worth deciding when answering Q3 in the
+README, and implementing alongside the CLI loop (step 1 above) if a code answer (not just a README answer)
+is wanted.
+
+---
+
+# Historical log (mini-TP demo phase — "Bob's cat" corpus)
+
+Tracks the step-by-step integration of the **moderator** into this RAG project, following the plan in
+[prep.md](prep.md) (a demo/reference project, not this one). Workflow: one step implemented at a time,
+user commits/pushes to GitHub after each step before the next one starts.
+
+Repo structure: originally a flat layout (`agent.py`, `config.py`, `rag.py`, `vector_db.py` at root) — steps 1-5 below were built that way. A structural refactor (see bottom of log) later moved code into `src/`, prompts into `prompts/`, keeping `tests/` as-is; file links in the early log entries point at the paths as they were at the time, not necessarily where they live now. **The mini-TP's own corpus/vector-db/rag code has since been superseded by the real Code du travail data_prep/ pipeline — treat retrieve()/VectorDB signatures mentioned below as historical, not current (see Architecture section above for current signatures).**
 
 ## Plan (checklist)
 
