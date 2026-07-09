@@ -16,14 +16,27 @@ pipeline + real vector_db.py rewrite). The historical log below (from the mini-T
 context but paths/behavior it describes no longer match current code — the old demo corpus
 (`05_corpus_rag.csv`) has since been removed from the repo.
 
-## Status: all pf.md deliverables done
+## Status: all pf.md deliverables done, plus two post-Jalon-6 improvements
 
 Jalons 1-6 all implemented and verified against the real 11,710-chunk corpus (not just test fixtures):
 ingestion, chunking/indexation with persistence, retrieval validated (Jalon 3, `scripts/evaluate_retrieval.py`,
 4/5 — one documented finding, not a bug, see below), citations + refusal + legal disclaimer wired through
 generation, CLI + web UI both working, moderator as the Jalon 6 improvement. README and compte rendu
-written. Nothing outstanding from the original punch list — remaining items below are optional
-future-improvement ideas, not missing requirements.
+written. Nothing outstanding from the original punch list.
+
+Two things landed since the original "all done" state, both documented in README:
+- **Query decomposition (HyDE)** — `src/decomposer.py` (`Decomposer`), wired into `src/rag.py`'s
+  `_retrieve_deduplicated`: splits a question into 2-4 atomic sub-questions, reformulates each as a
+  HyDE-style hypothetical statement, retrieves 8 chunks per sub-question (deduped, capped at 20 total via
+  `Rag.MAX_TOTAL_CHUNKS`). Falls back to `[question]` on any failure. This resolves the old "retrieval
+  breadth doesn't adapt to compound questions" gap (removed from Known gaps below).
+- **Automatic daily corpus refresh** — `src/auto_refresh.py`, scheduled from `api.py`'s `lifespan` via
+  APScheduler (`daily_corpus_refresh` job, 24h interval). Rebuilds into a temp directory and swaps
+  `rag.vector_db_object` once ready, so the live API is never without a working vector DB and never holds
+  the lock conflict that makes the manual `scripts/update_corpus.py` refuse to run. First run is timed off
+  `corpus_meta.json`'s `generated_at` (via `seconds_until_next_refresh`) so a freshly-deployed persistent
+  volume isn't rebuilt for no reason. `cli.py` is unaffected — it's a one-shot local tool, still relies on
+  the manual script or the 180-day staleness banner.
 
 ## Architecture
 
@@ -48,19 +61,37 @@ src/                     # package (absolute imports `from src.x import y`, sys.
                            LLM_MODEL="openai/gpt-oss-120b", MODERATOR_MODEL="openai/gpt-oss-safeguard-20b")
   agent.py                 Agent: thin Groq client wrapper + static read_file helper
   moderator.py             Moderator(Agent): prompt-injection classifier, JSON output {is_prompt_injection}
+  decomposer.py            Decomposer(Agent): decompose(question) -> 2-4 atomic sub-questions, each
+                           reformulated as a HyDE-style hypothetical statement (JSON output
+                           {sub_questions, hyde_statements}, uses hyde_statements for retrieval).
+                           MAX_SUB_QUESTIONS = 4. Any failure (parsing/API/empty) -> falls back to
+                           [question] so the RAG pipeline is never blocked by this step.
   vector_db.py             VectorDB: create_vector_db (embed+persist to Chroma, batched inserts,
                            embedding model name stored in collection metadata) / load_vector_db
                            (reload without reindexing — checked via os.path.exists(vector_db_path), NOTE:
                            a pre-created-but-empty directory will wrongly look "existing" — see tests/test_rag.py
                            fixture workaround). retrieve(question, n=5) -> list[dict] (NOT a tuple).
-  rag.py                   Rag(Agent): build_context() formats retrieved chunks with [Article N] labels
-                           into the system prompt; ask_rag() moderates first (refuses+disclaimer, no LLM/
-                           retrieval call if flagged), else retrieves -> LLM call (temp=0) -> appends
-                           Rag.DISCLAIMER to every response path. Rag.REFUSAL / Rag.DISCLAIMER are class
-                           constants.
+  rag.py                   Rag(Agent): __init__ builds vector_db_object, Moderator, Decomposer.
+                           _retrieve_deduplicated() runs decomposer.decompose(question), retrieves
+                           CHUNKS_PER_SUBQUESTION=8 chunks per sub-question, dedupes by id, caps at
+                           MAX_TOTAL_CHUNKS=20. build_context() formats those chunks with [Article N]
+                           labels into the system prompt; ask_rag() moderates first (refuses+disclaimer,
+                           no LLM/retrieval call if flagged), else retrieves -> LLM call (temp=0) ->
+                           appends Rag.DISCLAIMER to every response path. Rag.REFUSAL / Rag.DISCLAIMER are
+                           class constants.
   bootstrap.py             ensure_vector_db_built(): shared by api.py and cli.py — builds my_vector_db/
                            from PARSED_CORPUS_PATH JSON if missing, clear RuntimeError if the JSON is
                            missing too (points at data_prep/code_cli.py).
+  auto_refresh.py          refresh_rag(rag): re-downloads+reparses the corpus (force) and rebuilds the
+                           vector DB into a timestamped temp dir (my_vector_db_refresh_<ts>/, gitignored),
+                           then swaps rag.vector_db_object onto it and deletes the previous temp dir.
+                           Never touches the dir currently in use — no lock conflict with the running
+                           process, unlike scripts/update_corpus.py's in-place rmtree+rebuild. Exceptions
+                           are caught and logged; old DB keeps serving on failure.
+                           seconds_until_next_refresh(): reads corpus_meta.json's generated_at, returns 0
+                           if missing/stale, else seconds remaining until it turns REFRESH_INTERVAL_HOURS
+                           (24) old — used by api.py to avoid an immediate rebuild when a persistent
+                           volume already has a fresh corpus.
 
 prompts/
   rag_prompt_system.txt    Code-du-travail-specific: citation obligation, refusal wording ("je ne trouve
@@ -68,18 +99,32 @@ prompts/
                            answer caveats (Q4), legal-advice boundary (Q5), explicitly told NOT to
                            self-append a disclaimer (code guarantees it instead).
   moderator_system.txt     Code-du-travail-specific injection-detection prompt.
+  decomposer_system.txt    Two-step prompt: (1) split question into 2-4 atomic sub-questions, (2)
+                           reformulate each as a HyDE-style declarative statement ("Le Code du travail
+                           fixe..."), explicitly forbidden from inventing article numbers/figures it
+                           doesn't know. JSON output {sub_questions, hyde_statements}, same-length
+                           index-aligned arrays.
 
 cli.py                    Interactive CLI (Jalon 5): freshness banner (reads corpus_meta.json, warns if
                            >180 days old) -> question loop -> answer + sources + disclaimer -> quit/exit/q.
+                           No auto-refresh (see auto_refresh.py above) — one-shot local tool.
 api.py                    FastAPI app, same Rag engine as cli.py via src/bootstrap.py. GET / serves
-                           static/index.html. POST /ask -> {"answer": str} (disclaimer baked in).
+                           static/index.html. GET /meta -> corpus generated_at + chunk_count (Q3, web
+                           equivalent of the CLI freshness banner). POST /ask -> {"answer": str,
+                           "sources": [...]} (disclaimer baked into answer, sources deduplicated by
+                           (num, url)). lifespan also starts a BackgroundScheduler (APScheduler) running
+                           auto_refresh.refresh_rag every 24h, first run timed via
+                           seconds_until_next_refresh() — see auto_refresh.py above and README Q3.
 static/index.html         vanilla HTML/CSS/JS chat UI, no build step.
 Procfile                  web: uvicorn api:app --host 0.0.0.0 --port $PORT
 
 scripts/
   evaluate_retrieval.py    Jalon 3: 5 known (question, expected_article) pairs, checks top-k, no LLM call.
-  update_corpus.py         Force re-download from GitHub + reparse + full vector DB rebuild (rmtree +
-                           recreate). Use when the upstream SocialGouv/legi-data source changes.
+                           Calls VectorDB.retrieve directly (single query) — doesn't go through Decomposer.
+  update_corpus.py         Manual force re-download from GitHub + reparse + full vector DB rebuild (rmtree
+                           in place + recreate). Refuses to run if the DB is locked by a running
+                           cli.py/api.py. Superseded in production by api.py's automatic daily refresh
+                           (auto_refresh.py) — kept for local/dev use and to force an immediate refresh.
 
 tests/
   conftest.py              sys.path bootstrap (repo root + data_prep/) + mini_corpus fixture
@@ -93,9 +138,12 @@ tests/
                            retrieve()->list[dict] API.
   test_code_*.py            cover data_prep/ (downloader/parser/orchestrator).
   test_agent.py, test_config.py, test_moderator.py   general coverage.
+  No dedicated test_decomposer.py or test_auto_refresh.py yet — both are only exercised indirectly
+                           (decomposer via test_rag.py's ask_rag calls; auto_refresh isn't exercised by
+                           the suite at all, since it needs a live scheduler + real network round-trip).
 
-All 29 tests pass with real Groq calls + real embeddings (no mocking, per this repo's established style;
-GROQ_API_KEY is present in .env). Full suite runtime ~60s.
+All 31 tests pass with real Groq calls + real embeddings (no mocking, per this repo's established style;
+GROQ_API_KEY is present in .env). Full suite runtime ~90s.
 ```
 
 ## The one real finding worth remembering: retrieval precision limit
@@ -115,13 +163,17 @@ lexical+vector search, a different embedding model, or a reranking step.
 
 1. No programmatic check that article numbers the LLM cites actually belong to the retrieved context —
    relies entirely on the prompt instruction, not a code-level guard (Q2).
-2. Freshness banner (corpus_meta.json date) is CLI-only; the web API doesn't surface it (Q3).
-3. Retrieval breadth doesn't adapt to compound/multi-part questions — `build_context` always calls
-   `retrieve(question)` with the default `n=5` regardless of question complexity. The prompt instructs the
-   LLM to address each sub-question separately, but the retrieval budget itself isn't widened for them.
-4. `data_prep/`'s flat-import style (`from code_orchestrator import ...`) only works via direct script
+2. `data_prep/`'s flat-import style (`from code_orchestrator import ...`) only works via direct script
    execution, not `python -m data_prep.code_cli` — documented as a constraint (README, this file) rather
    than converted to package-relative imports.
+3. No dedicated test file for `src/decomposer.py` or `src/auto_refresh.py` — see tests/ note above.
+4. `scripts/evaluate_retrieval.py` (Jalon 3) still queries `VectorDB.retrieve` directly, bypassing
+   `Decomposer` — its 4/5 result reflects single-query retrieval only, not the decomposed-question path
+   `Rag.ask_rag` actually uses in production.
+
+Resolved since the original gap list: (a) retrieval breadth not adapting to compound questions — fixed by
+`Decomposer` widening the search per sub-question (see Status above); (b) the freshness banner being
+CLI-only — `GET /meta` in api.py has surfaced it to the web UI for a while now.
 
 ---
 
