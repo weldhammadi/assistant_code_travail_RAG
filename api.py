@@ -1,15 +1,19 @@
 import json
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 
+from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from src import config
+from src.auto_refresh import REFRESH_INTERVAL_HOURS, refresh_rag, seconds_until_next_refresh
 from src.bootstrap import ensure_vector_db_built
 from src.rag import Rag
 
 rag = None
+scheduler = BackgroundScheduler()
 
 
 @asynccontextmanager
@@ -18,7 +22,23 @@ async def lifespan(app: FastAPI):
 
 	ensure_vector_db_built()
 	rag = Rag(vector_db_path=str(config.VECTOR_DB_PATH))
+
+	# Q3 (fraîcheur) : la source amont est mise à jour tous les jours, donc on rafraîchit le
+	# corpus + la base vectorielle en tâche de fond selon le même rythme (voir src/auto_refresh.py).
+	first_run = datetime.now() + timedelta(seconds=seconds_until_next_refresh())
+	scheduler.add_job(
+		refresh_rag,
+		"interval",
+		hours=REFRESH_INTERVAL_HOURS,
+		next_run_time=first_run,
+		args=[rag],
+		id="daily_corpus_refresh",
+	)
+	scheduler.start()
+
 	yield
+
+	scheduler.shutdown()
 
 
 app = FastAPI(lifespan=lifespan)
