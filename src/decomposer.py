@@ -33,7 +33,7 @@ class Decomposer(Agent):
 				temperature=0,
 			)
 			result = json.loads(chat_completion.choices[0].message.content)
-			sub_questions = result.get("sub_questions", [])
+			sub_questions = result.get("hyde_statements", [])
 			sub_questions = [q.strip() for q in sub_questions if isinstance(q, str) and q.strip()]
 
 			if not sub_questions:

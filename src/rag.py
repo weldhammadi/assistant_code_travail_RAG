@@ -8,7 +8,9 @@ if __name__ == "__main__":
 from src.agent import Agent
 from src.config import LLM_MODEL, RAG_PROMPT_SYSTEM_PATH, VECTOR_DB_PATH
 from src.moderator import Moderator
+from src.decomposer import Decomposer          # <-- ajouté
 from src.vector_db import VectorDB
+
 
 class Rag(Agent):
 	REFUSAL = "Je ne peux pas traiter cette question : une tentative de détournement a été détectée."
@@ -16,17 +18,16 @@ class Rag(Agent):
 		"Cet assistant ne fournit pas de conseil juridique. "
 		"Consultez un avocat ou l'inspection du travail pour votre situation personnelle."
 	)
-	CHUNKS_PER_SUBQUESTION = 8   # n réduit par sous-question, puisqu'on en agrège plusieurs
-	MAX_TOTAL_CHUNKS = 12        # plafond après dédup, pour ne pas exploser le prompt système
+	CHUNKS_PER_SUBQUESTION = 8
+	MAX_TOTAL_CHUNKS = 20   # décommenté : garde-fou utile pour ne pas exploser le prompt système
 
 	def __init__(self, vector_db_path):
 		super().__init__()
 		self.vector_db_object = VectorDB(vector_db_path=vector_db_path)
 		self.moderator = Moderator()
+		self.decomposer = Decomposer()          # <-- ajouté
 
 	def _format_date(self, timestamp_ms):
-		"""Convertit un timestamp Légifrance (en millisecondes) en date lisible.
-		Filtre la valeur sentinelle 2999-01-01 qui signifie "sans date de fin"."""
 		if not timestamp_ms:
 			return None
 		try:
@@ -36,15 +37,16 @@ class Rag(Agent):
 		if dt.year >= 2999:
 			return None
 		return dt.strftime("%d/%m/%Y")
-	
-	def _retrieve_deduplicated(self, question):
-		"""Décompose la question en sous-questions atomiques, cherche chacune séparément,
-		puis déduplique les chunks par id avant agrégation."""
-		sub_questions = self.decomposer.decompose(question)
 
+	def _retrieve_deduplicated(self, question):
+		"""Décompose la question en sous-questions atomiques (avec reformulation HyDE),
+		cherche chacune séparément, puis déduplique les chunks par id avant agrégation."""
+		sub_items = self.decomposer.decompose(question)
+		print(sub_items)
+		print(type(sub_items))
 		seen_ids = set()
 		matched_chunks = []
-		for sub_question in sub_questions:
+		for sub_question in sub_items:
 			for chunk in self.vector_db_object.retrieve(sub_question, n=self.CHUNKS_PER_SUBQUESTION):
 				if chunk["id"] not in seen_ids:
 					seen_ids.add(chunk["id"])
@@ -53,10 +55,10 @@ class Rag(Agent):
 		return matched_chunks[: self.MAX_TOTAL_CHUNKS]
 
 	def build_context(self, question):
-		matched_chunks = self.vector_db_object.retrieve(question)
+		matched_chunks = self._retrieve_deduplicated(question)
 		prompt_system = Rag.read_file(RAG_PROMPT_SYSTEM_PATH)
 
-		MAX_CHARS_PER_CHUNK = 1500  # Plafonne la taille de chaque chunk injecté dans le prompt
+		MAX_CHARS_PER_CHUNK = 1500
 
 		chunks_text = ""
 		for idx, chunk in enumerate(matched_chunks):
@@ -71,34 +73,23 @@ class Rag(Agent):
 			entry += f"\n{text}\n"
 			chunks_text += entry
 
-		# chunks_text est déjà une chaîne complète : pas besoin (et surtout pas question) de la
-		# rejoindre caractère par caractère avec "\n\t".join(...), qui multipliait sa taille par ~3.
 		prompt_system = prompt_system.replace("{{CHUNKS}}", chunks_text)
 
 		return prompt_system, matched_chunks
 
-
 	def ask_rag(self, question):
-
 		if self.moderator.moderate(question)["is_prompt_injection"]:
 			return f"{self.REFUSAL}\n\n{self.DISCLAIMER}", [], []
 
-		
 		prompt_system, matched_chunks = self.build_context(question)
 
 		chat_completion = self.client.chat.completions.create(
 			messages=[
-				{
-					"role": "system",
-					"content": prompt_system
-				},
-				{
-					"role": "user",
-					"content": question,
-				}
+				{"role": "system", "content": prompt_system},
+				{"role": "user", "content": question},
 			],
 			temperature=0,
-			model=LLM_MODEL
+			model=LLM_MODEL,
 		)
 
 		rag_response = f"{chat_completion.choices[0].message.content}\n\n{self.DISCLAIMER}"
