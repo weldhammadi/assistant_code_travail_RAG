@@ -12,6 +12,10 @@ GROQ_API_KEY=os.environ["GROQ_API_KEY"]
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROMPTS_DIR = BASE_DIR / "prompts"
 
+# DATA_DIR is overridable (DATA_DIR env var) so a persistent volume (Railway, etc.) can be mounted
+# and pointed at without code changes — avoids re-downloading/re-embedding on every deploy.
+DATA_DIR = Path(os.environ["DATA_DIR"]) if os.environ.get("DATA_DIR") else BASE_DIR / "data"
+
 # Legifrance config
 SOURCE_URL_TEMPLATE = (
         "https://raw.githubusercontent.com/SocialGouv/legi-data/master/data/{legi_id}.json"
@@ -32,9 +36,11 @@ SECTION_PATTERNS = [
         ("sous_section", re.compile(r"^\s*Sous-section\b", re.IGNORECASE)),
     ]
 # Database config
-CORPUS_PATH = BASE_DIR / "data" / "raw" / "code_travail_corpus.csv"
+PARSED_CORPUS_PATH = DATA_DIR / "corpus_code_travail.json"
 
-PARSED_CORPUS_PATH = BASE_DIR / "data" / "corpus_code_travail.json"
+CORPUS_META_PATH = DATA_DIR / "corpus_meta.json"
+
+RAW_CACHE_DIR = DATA_DIR / "raw"
 
 EMBEDDING_MODEL="distiluse-base-multilingual-cased-v2"
 
@@ -46,6 +52,6 @@ MODERATOR_SYSTEM_PROMPT_PATH = PROMPTS_DIR / "moderator_system.txt"
 
 RAG_PROMPT_SYSTEM_PATH = PROMPTS_DIR / "rag_prompt_system.txt"
 
-# CORPUS_PATH = BASE_DIR / "05_corpus_rag.csv"
-
-VECTOR_DB_PATH = BASE_DIR / "my_vector_db"
+# VECTOR_DB_PATH is independently overridable (VECTOR_DB_PATH env var) for the same reason as
+# DATA_DIR — default unchanged (BASE_DIR / "my_vector_db") so existing local setups keep working.
+VECTOR_DB_PATH = Path(os.environ["VECTOR_DB_PATH"]) if os.environ.get("VECTOR_DB_PATH") else BASE_DIR / "my_vector_db"

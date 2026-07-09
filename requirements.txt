@@ -2,7 +2,6 @@ groq
 python-dotenv
 sentence-transformers
 chromadb
-pandas
 pytest
 fastapi
 uvicorn

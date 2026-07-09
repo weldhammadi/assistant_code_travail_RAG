@@ -1,6 +1,7 @@
 """
 Orchestrator for the data preparation pipeline.
 """
+from datetime import datetime, timezone
 from pathlib import Path
 from code_downloader import CodeTravailDownloader
 from code_parser import CodeTravailParser
@@ -23,6 +24,7 @@ class CodeOrchestrator:
         max_chars: int = 3000,
     ):
         self.output_path = output_path
+        self.meta_path = output_path.parent / "corpus_meta.json"
         self.downloader = CodeTravailDownloader(source_url_template, legi_id, cache_dir=raw_cache_dir)
         self.parser = CodeTravailParser(section_patterns=section_patterns, 
                                         raw_json_code={}, 
@@ -40,13 +42,25 @@ class CodeOrchestrator:
             self.chunks = self.chunks[:limit]
 
         self._save()
+        self._save_meta()
         self._print_summary()
         return self.chunks
-    
+
     def _save(self) -> None:
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.output_path, "w", encoding="utf-8") as f:
             json.dump([c.to_dict() for c in self.chunks], f, indent=2, ensure_ascii=False)
+
+    def _save_meta(self) -> None:
+        """Trace la date de génération du corpus (Q3 - fraîcheur), pour que l'assistant puisse
+        avertir l'utilisateur du risque d'obsolescence sans avoir à réindexer pour le savoir."""
+        meta = {
+            "generated_at": datetime.now(timezone.utc).date().isoformat(),
+            "source_url": self.downloader.source_url,
+            "chunk_count": len(self.chunks),
+        }
+        with open(self.meta_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
 
     def _print_summary(self) -> None:
         legislatif = sum(1 for c in self.chunks if c.categorie == "legislatif")

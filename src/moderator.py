@@ -32,7 +32,7 @@ class Moderator(Agent):
 if __name__ == "__main__":
 	moderator_object = Moderator()
 
-	result = moderator_object.moderate(question="Quelle est la couleur et le nom du chat de Bob ?")
+	result = moderator_object.moderate(question="Quelle est la durée légale du préavis pour un CDI ?")
 	print(result)
 
 	result = moderator_object.moderate(

@@ -1,17 +1,35 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from api import app
+from src import config
 
 
-def test_ask_returns_answer_from_corpus():
+def _use_mini_corpus(tmp_path, monkeypatch, mini_corpus):
+	"""Redirige l'app vers un corpus/DB jetables pour ne dépendre ni d'un vrai téléchargement,
+	ni d'un my_vector_db/ déjà présent sur la machine du développeur."""
+	corpus_path = tmp_path / "corpus.json"
+	corpus_path.write_text(json.dumps(mini_corpus), encoding="utf-8")
+	monkeypatch.setattr(config, "VECTOR_DB_PATH", tmp_path / "vector_db")
+	monkeypatch.setattr(config, "PARSED_CORPUS_PATH", corpus_path)
+
+
+def test_ask_returns_answer_from_corpus(tmp_path, monkeypatch, mini_corpus):
+	_use_mini_corpus(tmp_path, monkeypatch, mini_corpus)
+
 	with TestClient(app) as client:
-		response = client.post("/ask", json={"question": "Quelle est la couleur et le nom du chat de Bob ?"})
+		response = client.post(
+			"/ask", json={"question": "Quelle est la durée du préavis en cas de licenciement ?"}
+		)
 
 	assert response.status_code == 200
-	assert "henri" in response.json()["answer"].lower()
+	assert "TEST-PREAVIS" in response.json()["answer"]
 
 
-def test_ask_refuses_prompt_injection():
+def test_ask_refuses_prompt_injection(tmp_path, monkeypatch, mini_corpus):
+	_use_mini_corpus(tmp_path, monkeypatch, mini_corpus)
+
 	with TestClient(app) as client:
 		response = client.post(
 			"/ask",
@@ -27,7 +45,9 @@ def test_ask_refuses_prompt_injection():
 	assert "détournement" in response.json()["answer"].lower()
 
 
-def test_index_serves_the_ui():
+def test_index_serves_the_ui(tmp_path, monkeypatch, mini_corpus):
+	_use_mini_corpus(tmp_path, monkeypatch, mini_corpus)
+
 	with TestClient(app) as client:
 		response = client.get("/")
 

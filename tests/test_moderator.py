@@ -4,7 +4,7 @@ from src.moderator import Moderator
 def test_moderate_allows_legitimate_question():
 	moderator = Moderator()
 
-	result = moderator.moderate("Quelle est la couleur et le nom du chat de Bob ?")
+	result = moderator.moderate("Quelle est la durée légale du préavis pour un CDI ?")
 
 	assert result["is_prompt_injection"] is False
 
