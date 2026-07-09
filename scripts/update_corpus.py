@@ -11,7 +11,9 @@ import shutil
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent / "data_prep"))
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "data_prep"))
 
 from code_orchestrator import CodeOrchestrator  # noqa: E402
 

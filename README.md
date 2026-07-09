@@ -73,14 +73,25 @@ statique (`static/index.html`) et un unique endpoint `POST /ask`. Déployable te
 ### 4. Valider le retrieval (Jalon 3, avant tout appel LLM)
 
 ```bash
-python evaluate_retrieval.py
+python scripts/evaluate_retrieval.py
 ```
 
 Vérifie, pour 5 questions dont l'article attendu est connu à l'avance, que cet article remonte dans le
 top-k de la recherche vectorielle — sans jamais appeler le LLM. Résultat actuel sur le corpus réel :
 **4/5**, avec une limite connue documentée ci-dessous (Q1).
 
-### 5. Tests
+### 5. Mettre à jour le corpus depuis GitHub
+
+```bash
+python scripts/update_corpus.py
+```
+
+À lancer quand la source amont ([SocialGouv/legi-data](https://github.com/SocialGouv/legi-data)) a été
+mise à jour : force le retéléchargement (contrairement à l'étape 1, qui réutilise le cache local), reparse,
+puis reconstruit entièrement `my_vector_db/`. Refuse proprement (message explicite) si la base est
+verrouillée par un `cli.py`/`api.py` encore lancé, plutôt que d'échouer avec une erreur système opaque.
+
+### 6. Tests
 
 ```bash
 pytest
@@ -94,11 +105,11 @@ dépendre du téléchargement réel ; `tests/test_code_*.py` couvrent le pipelin
 
 ```
 data_prep/     ingestion : téléchargement (cache local) -> parsing de l'arbre Légifrance -> JSON de chunks
-src/           config, agent Groq de base, modérateur, base vectorielle (Chroma), RAG
+src/           config, agent Groq de base, modérateur, base vectorielle (Chroma), RAG, bootstrap partagé
 prompts/       prompts système (RAG + modérateur), séparés du code
+scripts/       evaluate_retrieval.py (Jalon 3), update_corpus.py (rafraîchir depuis GitHub)
 cli.py         boucle interactive en ligne de commande (module d'interrogation)
 api.py         API FastAPI + UI web statique
-evaluate_retrieval.py   validation du retrieval (Jalon 3)
 tests/         un fichier de test par module, + fixtures/mini_corpus.json
 ```
 

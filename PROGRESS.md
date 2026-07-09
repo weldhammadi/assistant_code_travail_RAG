@@ -10,141 +10,118 @@ refusing to answer outside its corpus, and always appending a legal disclaimer. 
 LangChain/LlamaIndex (forbidden by the assignment) — every brick (chunking, embeddings, vector store,
 prompt, LLM call) is hand-rolled.
 
-Note: this repo started life as a smaller "mini-TP" demo project (fictional corpus about "Bob's cat" —
-`05_corpus_rag.csv`, still present at repo root but unused/dead). It was pivoted to the real Code du
-travail project via the `feature/integrate-new-data` branch (data_prep/ pipeline + real vector_db.py
-rewrite). The historical log below (from the mini-TP phase) is kept for context but paths/behavior it
-describes may no longer match current code.
+This repo started life as a smaller "mini-TP" demo project (fictional corpus about "Bob's cat"). It was
+pivoted to the real Code du travail project via the `feature/integrate-new-data` branch (data_prep/
+pipeline + real vector_db.py rewrite). The historical log below (from the mini-TP phase) is kept for
+context but paths/behavior it describes no longer match current code — the old demo corpus
+(`05_corpus_rag.csv`) has since been removed from the repo.
+
+## Status: all pf.md deliverables done
+
+Jalons 1-6 all implemented and verified against the real 11,710-chunk corpus (not just test fixtures):
+ingestion, chunking/indexation with persistence, retrieval validated (Jalon 3, `scripts/evaluate_retrieval.py`,
+4/5 — one documented finding, not a bug, see below), citations + refusal + legal disclaimer wired through
+generation, CLI + web UI both working, moderator as the Jalon 6 improvement. README and compte rendu
+written. Nothing outstanding from the original punch list — remaining items below are optional
+future-improvement ideas, not missing requirements.
 
 ## Architecture
 
 ```
-data_prep/              # Jalon 1 — ingestion pipeline (not a package import path at runtime; run as scripts)
-  code_downloader.py     CodeTravailDownloader: downloads+caches raw Légifrance JSON (SocialGouv/legi-data mirror)
+data_prep/              # Jalon 1 — ingestion pipeline. Flat internal imports (from code_orchestrator
+                         # import ...) — only run these as direct scripts, never via `python -m`.
+  code_downloader.py      CodeTravailDownloader: downloads+caches raw Légifrance JSON (SocialGouv/legi-data mirror)
   code_parser.py          CodeTravailParser: walks the JSON tree -> flat list of Chunk (one per article,
                            split on paragraph boundaries if > max_chars). Builds breadcrumb hierarchy,
                            infers categorie (legislatif/reglementaire/autre), dedupes ids.
   chunk_structure.py      Chunk dataclass: id, text, code, source, categorie, num, cid, etat,
                            date_debut_vigueur, date_fin_vigueur, url
-  code_orchestrator.py    CodeOrchestrator: download -> parse -> write JSON corpus + summary print
-  code_cli.py              CLI entrypoint (argparse) -> python -m data_prep.code_cli (or run directly)
+  code_orchestrator.py    CodeOrchestrator: download -> parse -> write JSON corpus + corpus_meta.json
+                           (generated_at date, source_url, chunk_count — Q3 fraîcheur) -> summary print
+  code_cli.py              CLI entrypoint (argparse), run as `python data_prep/code_cli.py`
                            writes to data/corpus_code_travail.json by default (data/ is gitignored)
 
 src/                     # package (absolute imports `from src.x import y`, sys.path bootstrap for direct run)
-  config.py               env (GROQ_API_KEY), paths (BASE_DIR, PROMPTS_DIR, CORPUS_PATH [dead/unused],
-                           PARSED_CORPUS_PATH, VECTOR_DB_PATH), Légifrance constants (SOURCE_URL_TEMPLATE,
+  config.py               env (GROQ_API_KEY), paths (BASE_DIR, PROMPTS_DIR, PARSED_CORPUS_PATH,
+                           CORPUS_META_PATH, VECTOR_DB_PATH), Légifrance constants (SOURCE_URL_TEMPLATE,
                            LEGI_TEXT_ID, SECTION_PATTERNS...), model names (EMBEDDING_MODEL,
                            LLM_MODEL="openai/gpt-oss-120b", MODERATOR_MODEL="openai/gpt-oss-safeguard-20b")
   agent.py                 Agent: thin Groq client wrapper + static read_file helper
-  moderator.py              Moderator(Agent): prompt-injection classifier, JSON output {is_prompt_injection}
-  vector_db.py              VectorDB: create_vector_db (embed+persist to Chroma, batched inserts,
+  moderator.py             Moderator(Agent): prompt-injection classifier, JSON output {is_prompt_injection}
+  vector_db.py             VectorDB: create_vector_db (embed+persist to Chroma, batched inserts,
                            embedding model name stored in collection metadata) / load_vector_db
                            (reload without reindexing — checked via os.path.exists(vector_db_path), NOTE:
                            a pre-created-but-empty directory will wrongly look "existing" — see tests/test_rag.py
                            fixture workaround). retrieve(question, n=5) -> list[dict] (NOT a tuple).
-  rag.py                    Rag(Agent): build_context() formats retrieved chunks with [Article N] labels
+  rag.py                   Rag(Agent): build_context() formats retrieved chunks with [Article N] labels
                            into the system prompt; ask_rag() moderates first (refuses+disclaimer, no LLM/
                            retrieval call if flagged), else retrieves -> LLM call (temp=0) -> appends
                            Rag.DISCLAIMER to every response path. Rag.REFUSAL / Rag.DISCLAIMER are class
                            constants.
+  bootstrap.py             ensure_vector_db_built(): shared by api.py and cli.py — builds my_vector_db/
+                           from PARSED_CORPUS_PATH JSON if missing, clear RuntimeError if the JSON is
+                           missing too (points at data_prep/code_cli.py).
 
 prompts/
   rag_prompt_system.txt    Code-du-travail-specific: citation obligation, refusal wording ("je ne trouve
                            pas cette information dans ma base"), multi-part question handling, conditional
                            answer caveats (Q4), legal-advice boundary (Q5), explicitly told NOT to
                            self-append a disclaimer (code guarantees it instead).
-  moderator_system.txt     Code-du-travail-specific injection-detection prompt (domain description fixed,
-                           no longer references the old "Bob's cat" demo).
+  moderator_system.txt     Code-du-travail-specific injection-detection prompt.
 
-api.py                   FastAPI app. lifespan: if VECTOR_DB_PATH missing, builds it from
-                           PARSED_CORPUS_PATH JSON (raises clear RuntimeError telling user to run
-                           data_prep.code_cli first if that JSON is also missing) via
-                           VectorDB(corpus_dict=...). GET / serves static/index.html. POST /ask ->
-                           {"answer": str} (disclaimer already baked into the string by Rag.ask_rag).
-static/index.html        vanilla HTML/CSS/JS chat UI, no build step.
+cli.py                    Interactive CLI (Jalon 5): freshness banner (reads corpus_meta.json, warns if
+                           >180 days old) -> question loop -> answer + sources + disclaimer -> quit/exit/q.
+api.py                    FastAPI app, same Rag engine as cli.py via src/bootstrap.py. GET / serves
+                           static/index.html. POST /ask -> {"answer": str} (disclaimer baked in).
+static/index.html         vanilla HTML/CSS/JS chat UI, no build step.
 Procfile                  web: uvicorn api:app --host 0.0.0.0 --port $PORT
 
+scripts/
+  evaluate_retrieval.py    Jalon 3: 5 known (question, expected_article) pairs, checks top-k, no LLM call.
+  update_corpus.py         Force re-download from GitHub + reparse + full vector DB rebuild (rmtree +
+                           recreate). Use when the upstream SocialGouv/legi-data source changes.
+
 tests/
-  conftest.py               sys.path bootstrap (repo root + data_prep/) + mini_corpus fixture
+  conftest.py              sys.path bootstrap (repo root + data_prep/) + mini_corpus fixture
                            (scope="module" — required because test_rag.py's module-scoped `rag` fixture
                            depends on it; a function-scoped fixture would ScopeMismatch-error).
   fixtures/mini_corpus.json  4 fake-but-realistic chunks (TEST-PREAVIS, TEST-CONGES, TEST-RUPTURE,
                            TEST-SMIC), one per topic, used by test_vector_db/test_rag/test_api instead of
                            requiring a real Légifrance download for every test run. IDs are deliberately
                            fake (TEST-*) so nobody mistakes fixture text for real law.
-  test_vector_db.py, test_rag.py, test_api.py   rewritten this session (see log) to match the current
-                           VectorDB(corpus_dict=...) / retrieve()->list[dict] API — the old versions
-                           called a corpus_df/pandas/CSV signature that no longer exists.
-  test_code_*.py            cover data_prep/ (downloader/parser/orchestrator) — pre-existing, untouched.
-  test_agent.py, test_config.py, test_moderator.py   pre-existing, mostly untouched (test_moderator.py's
-                           example question swapped from "Bob's cat" to a labour-law question).
+  test_vector_db.py, test_rag.py, test_api.py   match the current VectorDB(corpus_dict=...) /
+                           retrieve()->list[dict] API.
+  test_code_*.py            cover data_prep/ (downloader/parser/orchestrator).
+  test_agent.py, test_config.py, test_moderator.py   general coverage.
 
 All 29 tests pass with real Groq calls + real embeddings (no mocking, per this repo's established style;
 GROQ_API_KEY is present in .env). Full suite runtime ~60s.
 ```
 
-## Status against pf.md (as of this session)
+## The one real finding worth remembering: retrieval precision limit
 
-Done: Jalon 1 (ingestion), Jalon 2 (chunking+indexation+persistence, embedding model tracked), Jalon 6
-bonus (moderator = "agent modérateur" improvement), git workflow (main/dev/feature+PRs already in git log).
-
-Fixed this session: legal disclaimer now guaranteed in code (`Rag.DISCLAIMER`, appended to every
-`ask_rag` return path — refusal and normal answer alike) rather than left to the LLM to remember;
-`rag_prompt_system.txt`/`moderator_system.txt` rewritten for the real domain; `api.py` + `test_api.py`/
-`test_vector_db.py`/`test_rag.py` fixed to match the current `VectorDB(corpus_dict=...)` signature
-(were still calling a dead `corpus_df`/pandas/CSV API); `pandas` dropped from requirements.txt (no
-longer used anywhere after that fix).
-
-Done since the note above was written: CLI loop (`cli.py`, uses shared `src/bootstrap.py::ensure_vector_db_built`
-also now used by `api.py`), and Jalon 3's retrieval validation script (`evaluate_retrieval.py`).
-
-The real corpus has been downloaded and indexed for real (not just the mini test fixture):
-`python data_prep/code_cli.py` (run as a **direct script**, not `python -m data_prep.code_cli` — its
-internal imports are flat/non-package-relative, e.g. `from code_orchestrator import ...`, so `-m` fails
-with `ModuleNotFoundError`; worth fixing under the config-cleanup item below) produced
-`data/corpus_code_travail.json`: **11,710 chunks** (4,432 législatif / 7,213 réglementaire / 65 autre) —
-confirms the "≥5 themes" corpus-coverage requirement holds by construction, since it downloads the whole
-Code du travail rather than being theme-limited. `my_vector_db/` was then rebuilt from this real corpus
-(`EMBEDDING_MODEL` = distiluse-base-multilingual-cased-v2, ~8min to embed on CPU).
-
-**`evaluate_retrieval.py` real result: 4/5 pass.** The one failure is a genuine, worth-documenting finding
-(exactly what Jalon 3 is for): for "Quelle est la durée du préavis en cas de licenciement pour un salarié
-en CDI ?", the expected article `L1234-1` (the actual "durée du préavis" article) ranks **11th**, behind
+`scripts/evaluate_retrieval.py` against the real corpus: **4/5 pass.** For "Quelle est la durée du préavis
+en cas de licenciement pour un salarié en CDI ?", the expected article `L1234-1` ranks **11th**, behind
 `R1234-4` (indemnité de licenciement salary calc) and `R1235-1` (chômage benefit reimbursement) at ranks
 1-2, and `L1234-6` (a related-but-different préavis sub-case) at rank 5. Tested and ruled out the
 breadcrumb-dilution hypothesis (stripping the repeated hierarchy prefix from `L1234-1`'s embedded text
 *lowered* cosine similarity to the query, 0.31 vs 0.36 — breadcrumb helps, isn't the cause). Root cause is
 embedding-model semantic imprecision on this specific French legal phrasing, not a chunking bug. Left
 undoctored (n stayed at the default 5 in `Rag.build_context`, since bumping k to e.g. 8 wouldn't reach
-rank 11 anyway) — **worth writing up in the README's Q1 answer and the compte rendu's "difficultés" /
-"avec plus de temps" sections** (candidate improvement: hybrid lexical+vector search, or a
-better/larger embedding model, or re-ranking).
+rank 11 anyway). Written up in README Q1 and COMPTE_RENDU.md. Candidate fix if revisited: hybrid
+lexical+vector search, a different embedding model, or a reranking step.
 
-Done since the note above was written: **README** is now filled in (justified technical choices, Q1-Q5
-answers, install/run instructions) — also added a Q3 fraîcheur mechanism that didn't exist before:
-`data_prep/code_orchestrator.py::_save_meta()` writes `data/corpus_meta.json` (generated_at date, source
-URL, chunk count) on every ingestion run; `config.CORPUS_META_PATH` points at it; `cli.py::print_freshness_banner()`
-reads it at startup and warns if the corpus is >180 days old. Web API doesn't surface this yet (documented
-as a known limitation in the README, not silently left out).
+## Known gaps (not required, but true — from COMPTE_RENDU.md "avec plus de temps")
 
-Still missing (see TodoWrite in active session, or re-derive from pf.md §5/§2 if starting fresh):
-1. **Compte rendu (one page)** — difficulties (lead with the L1234-1 retrieval finding), design decisions,
-   what you'd do with more time (hybrid search / better embedding model, given the finding above). Doesn't
-   exist anywhere in the repo yet.
-2. **config.py cleanup** — `CORPUS_PATH` (pointing at a CSV under `data/raw/` that the pipeline never
-   actually produces — only `PARSED_CORPUS_PATH`, the JSON, is real) is dead code, nothing references it
-   post api.py fix. Also worth fixing while in there: `data_prep/`'s flat-import style only works via
-   direct script execution (`python data_prep/code_cli.py`), not `-m` — this is now documented as a
-   constraint in the README rather than fixed; converting `data_prep/` to proper package-relative imports
-   for consistency with `src/` is still on the table if there's time.
-
-## Fraîcheur / corpus date (Q3, unresolved design question)
-
-Not yet decided: how the system surfaces the corpus's download date / risk of obsolescence to the user.
-No code addresses this yet — needs a decision (e.g. stamp the download date into the vector DB collection
-metadata alongside `embedding_model`, surface it in the CLI/API). Worth deciding when answering Q3 in the
-README, and implementing alongside the CLI loop (step 1 above) if a code answer (not just a README answer)
-is wanted.
+1. No programmatic check that article numbers the LLM cites actually belong to the retrieved context —
+   relies entirely on the prompt instruction, not a code-level guard (Q2).
+2. Freshness banner (corpus_meta.json date) is CLI-only; the web API doesn't surface it (Q3).
+3. Retrieval breadth doesn't adapt to compound/multi-part questions — `build_context` always calls
+   `retrieve(question)` with the default `n=5` regardless of question complexity. The prompt instructs the
+   LLM to address each sub-question separately, but the retrieval budget itself isn't widened for them.
+4. `data_prep/`'s flat-import style (`from code_orchestrator import ...`) only works via direct script
+   execution, not `python -m data_prep.code_cli` — documented as a constraint (README, this file) rather
+   than converted to package-relative imports.
 
 ---
 

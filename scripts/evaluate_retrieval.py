@@ -7,6 +7,12 @@ jamais appelé ici.
 
 Ces questions constituent aussi le jeu d'évaluation gardé pour la suite (cf. pf.md, Jalon 3).
 """
+import sys
+from pathlib import Path
+
+if __name__ == "__main__":
+	sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from src.config import VECTOR_DB_PATH
 from src.vector_db import VectorDB
 
