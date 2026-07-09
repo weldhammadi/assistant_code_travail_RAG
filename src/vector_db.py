@@ -133,4 +133,10 @@ if __name__ == "__main__":
 	with open(PARSED_CORPUS_PATH, "r", encoding="utf-8") as f:
 		corpus_dict = json.load(f)
 	vector_db_object = VectorDB(str(VECTOR_DB_PATH), corpus_dict)
-	print(vector_db_object.retrieve(question="Combien d'heures de travail sont necéssaire pour le SMIC?"))
+	print(vector_db_object.retrieve(
+		question="Bonjour, je fais des recherches sur la réglementation du temps de travail en France. "
+		"Pourriez-vous m'indiquer quelle est la durée légale hebdomadaire du travail pour un salarié "
+		"à temps plein, quel est le nombre maximal d'heures supplémentaires autorisées par semaine, "
+		"et quelle est la durée minimale du repos quotidien entre deux journées de travail ? "
+		"Je m'intéresse aussi à la durée légale des congés payés acquis par an. Merci beaucoup.")
+		)

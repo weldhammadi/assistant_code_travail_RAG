@@ -55,3 +55,7 @@ RAG_PROMPT_SYSTEM_PATH = PROMPTS_DIR / "rag_prompt_system.txt"
 # VECTOR_DB_PATH is independently overridable (VECTOR_DB_PATH env var) for the same reason as
 # DATA_DIR — default unchanged (BASE_DIR / "my_vector_db") so existing local setups keep working.
 VECTOR_DB_PATH = Path(os.environ["VECTOR_DB_PATH"]) if os.environ.get("VECTOR_DB_PATH") else BASE_DIR / "my_vector_db"
+
+DECOMPOSER_MODEL = "openai/gpt-oss-safeguard-20b"
+
+DECOMPOSER_SYSTEM_PROMPT_PATH = PROMPTS_DIR / "decomposer_system.txt"
