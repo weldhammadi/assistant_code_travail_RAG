@@ -67,8 +67,12 @@ sortir proprement.
 uvicorn api:app --reload
 ```
 
-Puis ouvrir `http://127.0.0.1:8000`. Même moteur (`src/rag.py`) que la CLI, via une petite UI HTML/CSS/JS
-statique (`static/index.html`) et un unique endpoint `POST /ask`.
+Puis ouvrir `http://127.0.0.1:8000`. Même moteur (`src/rag.py`) que la CLI, via une UI HTML/CSS/JS
+statique (`static/index.html`, sans dépendance externe) et deux endpoints : `POST /ask` (réponse +
+articles sources dédoublonnés, avec lien Légifrance) et `GET /meta` (date et taille du corpus).
+L'interface affiche les articles cités sous chaque réponse (cliquables vers Légifrance), la date du
+corpus dans l'en-tête — avec le même avertissement de fraîcheur à 180 jours que la CLI (Q3) — et
+l'avertissement juridique, ainsi que des exemples de questions au premier chargement.
 
 **Déploiement (Railway)** : `Procfile` + `railway.json` sont fournis. Comme `data/` et `my_vector_db/`
 sont gitignored, un conteneur fraîchement déployé n'a ni l'un ni l'autre — `src/bootstrap.py` gère ça
@@ -191,7 +195,8 @@ affiche la date du corpus ; si le corpus a plus de 180 jours, un avertissement e
 ("le droit du travail évolue... vérifiez qu'aucune réforme récente n'a modifié les articles cités"). Ce
 mécanisme répond honnêtement à l'exigence — indiquer la date et le risque d'obsolescence — sans prétendre
 la résoudre : une mise à jour effective du corpus nécessite de relancer l'ingestion (Jalon 1) puis une
-réindexation. **Limite assumée** : seule la CLI affiche cette date pour l'instant, pas l'interface web.
+réindexation. L'interface web affiche la même information via `GET /meta` (pastille dans l'en-tête,
+passant en avertissement au-delà du même seuil de 180 jours).
 
 ### Q4 — Réponses conditionnelles
 
@@ -221,7 +226,6 @@ avertissement dupliqué.
 
 ## Limites connues / pistes d'amélioration
 
-Voir le compte rendu pour le détail — en résumé : pas de vérification programmatique des citations (Q2),
-fraîcheur non affichée côté API (Q3), et la limite de retrieval documentée en Q1 (candidate naturelle pour
-une recherche hybride lexicale + vectorielle, en particulier pour les questions citant un numéro d'article
-explicite).
+Voir le compte rendu pour le détail — en résumé : pas de vérification programmatique des citations (Q2)
+et la limite de retrieval documentée en Q1 (candidate naturelle pour une recherche hybride lexicale +
+vectorielle, en particulier pour les questions citant un numéro d'article explicite).

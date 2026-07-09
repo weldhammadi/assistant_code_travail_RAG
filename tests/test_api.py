@@ -45,6 +45,32 @@ def test_ask_refuses_prompt_injection(tmp_path, monkeypatch, mini_corpus):
 	assert "détournement" in response.json()["answer"].lower()
 
 
+def test_ask_returns_sources(tmp_path, monkeypatch, mini_corpus):
+	_use_mini_corpus(tmp_path, monkeypatch, mini_corpus)
+
+	with TestClient(app) as client:
+		response = client.post(
+			"/ask", json={"question": "Quelle est la durée du préavis en cas de licenciement ?"}
+		)
+
+	assert response.status_code == 200
+	sources = response.json()["sources"]
+	assert sources, "une question normale doit remonter au moins une source"
+	for source in sources:
+		assert set(source) == {"num", "source", "etat", "url"}
+	assert "TEST-PREAVIS" in {source["num"] for source in sources}
+
+
+def test_meta_reports_corpus_freshness(tmp_path, monkeypatch, mini_corpus):
+	_use_mini_corpus(tmp_path, monkeypatch, mini_corpus)
+
+	with TestClient(app) as client:
+		response = client.get("/meta")
+
+	assert response.status_code == 200
+	assert set(response.json()) == {"generated_at", "chunk_count"}
+
+
 def test_index_serves_the_ui(tmp_path, monkeypatch, mini_corpus):
 	_use_mini_corpus(tmp_path, monkeypatch, mini_corpus)
 
