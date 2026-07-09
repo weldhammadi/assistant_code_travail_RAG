@@ -4,7 +4,7 @@ Tracks the step-by-step integration of the **moderator** into this RAG project, 
 
 Repo structure: originally a flat layout (`agent.py`, `config.py`, `rag.py`, `vector_db.py` at root) — steps 1-5 below were built that way. A structural refactor (see bottom of log) later moved code into `src/`, prompts into `prompts/`, keeping `tests/` as-is; file links in the early log entries point at the paths as they were at the time, not necessarily where they live now.
 
-## Plan (checklist)
+## Plan (checklist) 
 
 - [x] Step 1 — `MODERATOR_SYSTEM_PROMPT_PATH` constant added to `config.py` (`MODERATOR_MODEL` already existed)
 - [x] Step 2 — `moderator_system.txt` prompt file, adapted to the "Bob's cat" corpus context
