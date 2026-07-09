@@ -32,8 +32,6 @@ SECTION_PATTERNS = [
         ("sous_section", re.compile(r"^\s*Sous-section\b", re.IGNORECASE)),
     ]
 # Database config
-CORPUS_PATH = BASE_DIR / "data" / "raw" / "code_travail_corpus.csv"
-
 PARSED_CORPUS_PATH = BASE_DIR / "data" / "corpus_code_travail.json"
 
 CORPUS_META_PATH = BASE_DIR / "data" / "corpus_meta.json"
@@ -47,7 +45,5 @@ MODERATOR_MODEL="openai/gpt-oss-safeguard-20b"
 MODERATOR_SYSTEM_PROMPT_PATH = PROMPTS_DIR / "moderator_system.txt"
 
 RAG_PROMPT_SYSTEM_PATH = PROMPTS_DIR / "rag_prompt_system.txt"
-
-# CORPUS_PATH = BASE_DIR / "05_corpus_rag.csv"
 
 VECTOR_DB_PATH = BASE_DIR / "my_vector_db"
